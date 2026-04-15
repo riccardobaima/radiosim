@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d0f0e">
+<title>RadioSim — Simulatore Radio VHF/UHF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:         #0d0f0e;
+  --surface:    #141816;
+  --panel:      #1a1d1c;
+  --border:     #2a2e2c;
+  --accent:     #3ddc84;
+  --accent-dim: #1a5e38;
+  --tx:         #e85c2e;
+  --tx-dim:     #5c2410;
+  --amber:      #f5a623;
+  --amber-dim:  #5c3c0a;
+  --blue:       #4fc3f7;
+  --text:       #c8d4c8;
+  --text-dim:   #556655;
+  --mono:       'Share Tech Mono', monospace;
+  --sans:       'Barlow Condensed', sans-serif;
+  --body:       'Barlow', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 12px 48px;
+  overflow-x: hidden;
+}
+
+/* ── HEADER ─────────────────────────────── */
+.header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; width: 100%; max-width: 480px;
+}
+.logo-badge {
+  background: var(--accent); color: #000;
+  font-family: var(--sans); font-weight: 700; font-size: 11px;
+  letter-spacing: 2px; padding: 4px 8px; border-radius: 3px;
+}
+.header h1 { font-family: var(--sans); font-weight: 700; font-size: 20px; letter-spacing: 2px; }
+.conn-pill {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 6px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 10px 3px 6px;
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  transition: all 0.3s;
+}
+.conn-pill.connected { border-color: var(--accent-dim); color: var(--accent); }
+.conn-pill.error     { border-color: var(--tx-dim);     color: var(--tx); }
+.conn-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-dim); transition: background 0.3s;
+}
+.conn-pill.connected .conn-dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+.conn-pill.error     .conn-dot { background: var(--tx); }
+
+/* ── JOIN SCREEN ─────────────────────────── */
+#join-screen { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 18px; }
+#join-screen h2 { font-family: var(--sans); font-size: 26px; font-weight: 700; letter-spacing: 1px; color: var(--accent); }
+#join-screen p  { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+.field-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 3px;
+  color: var(--text-dim); margin-bottom: 6px;
+}
+.field input, .field select {
+  width: 100%; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-family: var(--mono);
+  font-size: 15px; padding: 11px 14px; outline: none; transition: border-color 0.2s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field select option { background: var(--panel); }
+.join-btn {
+  background: var(--accent); color: #000; border: none; border-radius: 8px;
+  font-family: var(--sans); font-weight: 700; font-size: 17px;
+  letter-spacing: 2px; padding: 15px; cursor: pointer; transition: opacity 0.2s;
+}
+.join-btn:hover { opacity: 0.85; }
+.join-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.info-box {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; font-size: 13px; color: var(--text-dim); line-height: 1.7;
+}
+.info-box strong { color: var(--text); }
+
+/* ── RADIO SCREEN ────────────────────────── */
+#radio-screen { display: none; width: 100%; max-width: 480px; flex-direction: column; gap: 14px; }
+#radio-screen.active { display: flex; }
+
+/* RADIO BODY */
+.radio-body {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden;
+}
+
+/* DISPLAY */
+.radio-display {
+  background: #060c07; border-bottom: 1px solid var(--border);
+  padding: 16px 20px 14px; position: relative;
+}
+.scanlines {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.1) 3px,rgba(0,0,0,.1) 4px);
+}
+.disp-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.disp-label { font-family: var(--mono); font-size: 9px; letter-spacing: 3px; color: #2a4a2a; }
+.sig-bars   { display: flex; gap: 3px; align-items: flex-end; }
+.sig-bar    { width: 4px; background: var(--accent-dim); border-radius: 1px; transition: background 0.2s; }
+.sig-bar.on { background: var(--accent); }
+.sig-bar:nth-child(1){height:5px} .sig-bar:nth-child(2){height:8px}
+.sig-bar:nth-child(3){height:12px} .sig-bar:nth-child(4){height:16px} .sig-bar:nth-child(5){height:20px}
+
+.freq-num  { font-family: var(--mono); font-size: 40px; color: var(--accent); letter-spacing: 4px; text-shadow: 0 0 24px rgba(61,220,132,.35); line-height: 1; }
+.freq-unit { font-family: var(--mono); font-size: 11px; color: #2a4a2a; letter-spacing: 3px; margin-top: 3px; }
+.disp-row3 { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.badge { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; padding: 2px 7px; border-radius: 3px; border: 1px solid; }
+.badge-ch  { color: var(--amber); border-color: var(--amber-dim); background: rgba(245,166,35,.07); }
+.badge-sq  { color: var(--text-dim); border-color: var(--border); }
+.my-cs     { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 2px; }
+
+/* TX BAR */
+.tx-bar {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 20px; display: flex; align-items: center; gap: 10px; min-height: 40px;
+  transition: background 0.15s;
+}
+.tx-bar.active { background: rgba(232,92,46,.18); }
+.tx-led { width: 10px; height: 10px; border-radius: 50%; background: var(--tx-dim); border: 1px solid #3c1a0a; transition: all .1s; flex-shrink: 0; }
+.tx-led.on { background: var(--tx); box-shadow: 0 0 8px var(--tx); border-color: var(--tx); animation: led-blink .6s ease-in-out infinite; }
+@keyframes led-blink { 0%,100%{opacity:1} 50%{opacity:.5} }
+.tx-who { font-family: var(--mono); font-size: 12px; color: var(--tx-dim); letter-spacing: 2px; transition: color .15s; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tx-who.active { color: var(--tx); }
+.tx-timer { font-family: var(--mono); font-size: 11px; color: var(--text-dim); min-width: 36px; text-align: right; }
+
+/* CONTROLS */
+.controls { display: flex; align-items: center; gap: 0; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.knob-grp { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 14px; }
+.knob-grp:not(:last-child) { border-right: 1px solid var(--border); margin-right: 8px; }
+.knob {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #2a2e2c, #111); border: 2px solid var(--border);
+  position: relative; cursor: pointer;
+}
+.knob::after {
+  content: ''; position: absolute; top: 5px; left: 50%;
+  transform: translateX(-50%); width: 3px; height: 7px;
+  background: var(--text-dim); border-radius: 2px;
+}
+.knob-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--text-dim); }
+.vol-wrap { flex: 1; margin: 0 10px; }
+.vol-wrap input[type=range] {
+  width: 100%; appearance: none; height: 3px;
+  background: var(--border); border-radius: 2px; outline: none;
+}
+.vol-wrap input[type=range]::-webkit-slider-thumb {
+  appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid var(--bg);
+}
+.vol-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--text-dim); text-align: center; margin-top: 4px; }
+
+/* PTT ZONE */
+.ptt-zone { padding: 22px 20px 18px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.ptt-hint { font-family: var(--mono); font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-align: center; }
+
+.ptt-btn {
+  width: 164px; height: 164px; border-radius: 50%;
+  border: 3px solid var(--border); background: var(--panel);
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  position: relative; overflow: visible; transition: transform .08s, background .1s, border-color .1s;
+  -webkit-touch-callout: none;
+}
+.ptt-btn::after {
+  content: ''; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2px solid transparent; transition: all .15s; pointer-events: none;
+}
+.ptt-btn:active { transform: scale(.96); }
+.ptt-btn.transmitting { background: rgba(232,92,46,.14); border-color: var(--tx); }
+.ptt-btn.transmitting::after { border-color: rgba(232,92,46,.5); animation: ring-pulse .7s ease-in-out infinite; }
+.ptt-btn.locked { opacity: .35; cursor: not-allowed; pointer-events: none; }
+@keyframes ring-pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.06);opacity:.4} }
+
+.ptt-icon { width: 42px; height: 42px; stroke: var(--text-dim); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .1s; }
+.ptt-btn.transmitting .ptt-icon { stroke: var(--tx); }
+.ptt-lbl { font-family: var(--sans); font-weight: 900; font-size: 18px; letter-spacing: 5px; color: var(--text-dim); transition: color .1s; }
+.ptt-btn.transmitting .ptt-lbl { color: var(--tx); }
+.ptt-sub { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--text-dim); }
+
+.meter-bar { width: 100%; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.meter-fill { height: 100%; width: 0%; border-radius: 3px; transition: width .05s; background: linear-gradient(90deg, var(--accent), #7fffb8); }
+.ptt-btn.transmitting ~ .meter-bar .meter-fill { background: linear-gradient(90deg, var(--tx), #ffaa88); }
+
+.ptt-status { font-family: var(--mono); font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-align: center; min-height: 16px; }
+
+/* ── LOG ──────────────────────────────────── */
+.section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.section-hdr {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.section-hdr-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-dim); }
+.section-hdr-txt { font-family: var(--sans); font-size: 12px; letter-spacing: 2px; color: var(--text-dim); }
+.section-hdr-badge { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--accent); }
+
+.log-body {
+  padding: 10px 16px; min-height: 100px; max-height: 180px;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+}
+.log-body::-webkit-scrollbar { width: 4px; }
+.log-body::-webkit-scrollbar-track { background: transparent; }
+.log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.log-entry { display: flex; gap: 10px; font-family: var(--mono); font-size: 12px; animation: fadeUp .2s ease; }
+.log-t  { color: var(--text-dim); flex-shrink: 0; }
+.log-cs { color: var(--accent); flex-shrink: 0; min-width: 90px; }
+.log-m  { color: var(--text); word-break: break-word; }
+.log-entry.tx .log-cs { color: var(--tx); }
+.log-entry.sys .log-cs { color: var(--blue); }
+@keyframes fadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+
+/* ── USERS ──────────────────────────────── */
+.users-grid { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; min-height: 52px; }
+.user-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 11px 5px 6px;
+  font-family: var(--mono); font-size: 12px; color: var(--text);
+  transition: all .2s;
+}
+.user-chip.speaking { border-color: var(--tx); color: var(--tx); background: rgba(232,92,46,.1); }
+.user-chip.me       { border-color: var(--accent-dim); }
+.u-av {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: var(--accent); flex-shrink: 0;
+}
+.user-chip.speaking .u-av { background: var(--tx-dim); color: var(--tx); }
+.user-chip.me .u-av { background: var(--accent); color: #000; }
+
+/* ── RECONNECT BANNER ───────────────────── */
+.reconnect-banner {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--tx-dim); border-top: 1px solid var(--tx);
+  padding: 12px 20px; text-align: center;
+  font-family: var(--mono); font-size: 13px; color: var(--tx);
+  z-index: 999;
+}
+.reconnect-banner.show { display: block; }
+
+@media(max-width:400px){
+  .freq-num{font-size:32px}
+  .ptt-btn{width:148px;height:148px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="logo-badge">VHF/UHF</span>
+  <h1>RADIOSIM</h1>
+  <div class="conn-pill" id="conn-pill">
+    <div class="conn-dot"></div>
+    <span id="conn-label">OFFLINE</span>
+  </div>
+</div>
+
+<!-- ══ JOIN SCREEN ══════════════════════════ -->
+<div id="join-screen">
+  <h2>ACCESSO AL CANALE</h2>
+  <p>Inserisci il tuo nominativo e scegli il canale. Tutti i volontari devono usare la stessa <strong>Stanza</strong> e lo stesso <strong>Canale</strong>.</p>
+
+  <div class="field">
+    <div class="field-label">NOMINATIVO / CALLSIGN</div>
+    <input id="in-callsign" type="text" placeholder="es. ALFA-1" maxlength="12" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="field">
+    <div class="field-label">CANALE</div>
+    <select id="in-channel">
+      <option value="1">CH 01 — 145.500 MHz  (Chiamata)</option>
+      <option value="2">CH 02 — 145.575 MHz  (Operativo)</option>
+      <option value="3">CH 03 — 433.500 MHz  (Emergenza)</option>
+      <option value="4">CH 04 — 446.000 MHz  (Formazione)</option>
+    </select>
+  </div>
+  <div class="field">
+    <div class="field-label">STANZA / SESSIONE</div>
+    <input id="in-room" type="text" value="FORMAZIONE-01" maxlength="24" autocomplete="off" spellcheck="false">
+  </div>
+
+  <button class="join-btn" id="join-btn" onclick="doJoin()">ENTRA SUL CANALE ↗</button>
+
+  <div class="info-box">
+    <strong>Come funziona:</strong><br>
+    1. Tutti i volontari aprono questa pagina sul proprio dispositivo.<br>
+    2. Ogni volontario inserisce il proprio nominativo e la stessa stanza.<br>
+    3. Su PC usa la <strong>barra spaziatrice</strong> come tasto PTT.<br>
+    4. Su mobile tieni premuto il <strong>grande tasto PTT</strong>.<br>
+    5. Come su una vera radio: solo uno parla alla volta.
+  </div>
+</div>
+
+<!-- ══ RADIO SCREEN ═════════════════════════ -->
+<div id="radio-screen">
+
+  <div class="radio-body">
+    <!-- DISPLAY -->
+    <div class="radio-display">
+      <div class="scanlines"></div>
+      <div class="disp-row1">
+        <span class="disp-label">CANALE ATTIVO</span>
+        <div class="sig-bars" id="sig-bars">
+          <div class="sig-bar on"></div><div class="sig-bar on"></div>
+          <div class="sig-bar on"></div><div class="sig-bar"></div><div class="sig-bar"></div>
+        </div>
+      </div>
+      <div class="freq-num" id="freq-num">145.500</div>
+      <div class="freq-unit">MHz — FM  NARROW</div>
+      <div class="disp-row3">
+        <span class="badge badge-ch" id="badge-ch">CH 01</span>
+        <span class="badge badge-sq">SQL 5</span>
+        <span class="my-cs" id="my-cs">---</span>
+      </div>
+    </div>
+
+    <!-- TX BAR -->
+    <div class="tx-bar" id="tx-bar">
+      <div class="tx-led" id="tx-led"></div>
+      <span class="tx-who" id="tx-who">CANALE LIBERO</span>
+      <span class="tx-timer" id="tx-timer"></span>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls">
+      <div class="knob-grp">
+        <div class="knob"></div>
+        <div class="knob-lbl">VOL</div>
+      </div>
+      <div class="vol-wrap">
+        <input type="range" min="0" max="100" value="85" id="vol-range">
+        <div class="vol-lbl">VOLUME RICEZIONE</div>
+      </div>
+      <div class="knob-grp">
+        <div class="knob"></div>
+        <div class="knob-lbl">SQL</div>
+      </div>
+    </div>
+
+    <!-- PTT -->
+    <div class="ptt-zone">
+      <div class="ptt-hint" id="ptt-hint">TIENI PREMUTO PER TRASMETTERE &nbsp;·&nbsp; [SPAZIO] SU PC</div>
+
+      <button class="ptt-btn" id="ptt-btn"
+        ontouchstart="pttDown(event)" ontouchend="pttUp(event)" ontouchcancel="pttUp(event)"
+        onmousedown="pttDown(event)" onmouseup="pttUp(event)" onmouseleave="pttUp(event)"
+        oncontextmenu="return false">
+        <svg class="ptt-icon" viewBox="0 0 40 40">
+          <circle cx="20" cy="15" r="7"/>
+          <path d="M10 34c0-5.52 4.48-10 10-10s10 4.48 10 10"/>
+          <line x1="20" y1="29" x2="20" y2="34"/>
+          <line x1="16" y1="34" x2="24" y2="34"/>
+        </svg>
+        <span class="ptt-lbl">PTT</span>
+        <span class="ptt-sub">PUSH TO TALK</span>
+      </button>
+
+      <div class="meter-bar"><div class="meter-fill" id="meter-fill"></div></div>
+      <div class="ptt-status" id="ptt-status">Inizializzazione microfono...</div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-hdr-dot"></div>
+      <span class="section-hdr-txt">LOG CANALE</span>
+      <span class="section-hdr-badge" id="log-badge">0 msg</span>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </div>
+
+  <!-- UTENTI -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-hdr-dot"></div>
+      <span class="section-hdr-txt">UTENTI SUL CANALE</span>
+      <span class="section-hdr-badge" id="users-count">0</span>
+    </div>
+    <div class="users-grid" id="users-grid"></div>
+  </div>
+
+</div>
+
+<!-- RECONNECT BANNER -->
+<div class="reconnect-banner" id="reconnect-banner">
+  ⚠ Connessione persa — riconnessione in corso...
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// CONFIG — in produzione la URL è auto-rilevata
+// ════════════════════════════════════════════════
+function getWsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}`;
+}
+
+const FREQS    = {'1':'145.500','2':'145.575','3':'433.500','4':'446.000'};
+const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};
+
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let myCallsign='', myChannel='1', myRoom='', myId='';
+let ws=null, reconnectTimer=null, pingInterval=null;
+let audioCtx=null, analyser=null, micStream=null;
+let peers={}; // id -> RTCPeerConnection
+let users={}; // id -> {callsign, speaking}
+let isTx=false, chanBusy=false, currentSpeaker=null;
+let txStartTs=null, txTimerInt=null, meterInt=null;
+let sigInt=null, logCount=0;
+let volGain=0.85;
+
+// ════════════════════════════════════════════════
+// JOIN
+// ════════════════════════════════════════════════
+async function doJoin() {
+  const cs = document.getElementById('in-callsign').value.trim().toUpperCase();
+  if (!cs) { alert('Inserisci il tuo nominativo'); return; }
+  myCallsign = cs;
+  myChannel  = document.getElementById('in-channel').value;
+  myRoom     = document.getElementById('in-room').value.trim().toUpperCase() || 'FORMAZIONE-01';
+
+  document.getElementById('join-btn').disabled = true;
+  document.getElementById('join-btn').textContent = 'CONNESSIONE IN CORSO...';
+
+  await initMic();
+  connectWS();
+}
+
+function showRadio() {
+  document.getElementById('join-screen').style.display = 'none';
+  document.getElementById('radio-screen').classList.add('active');
+  document.getElementById('my-cs').textContent = myCallsign;
+  document.getElementById('freq-num').textContent = FREQS[myChannel];
+  document.getElementById('badge-ch').textContent = CH_LBLS[myChannel];
+  startSigAnim();
+}
+
+// ════════════════════════════════════════════════
+// MICROPHONE
+// ════════════════════════════════════════════════
+async function initMic() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }
+    });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate:16000 });
+    const src = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
+    src.connect(analyser);
+    // Mute tracks — li attiviamo solo durante PTT
+    micStream.getAudioTracks().forEach(t => t.enabled = false);
+    setPttStatus('Microfono pronto — premi PTT per trasmettere');
+  } catch(e) {
+    setPttStatus('⚠ Microfono non disponibile: ' + e.message);
+    console.warn('[MIC]', e);
+  }
+}
+
+// ════════════════════════════════════════════════
+// WEBSOCKET
+// ════════════════════════════════════════════════
+function connectWS() {
+  if (ws) { try{ws.close()}catch{} }
+  ws = new WebSocket(getWsUrl());
+
+  ws.onopen = () => {
+    setConn('connecting', 'CONNESSIONE...');
+    ws.send(JSON.stringify({ type:'join', callsign:myCallsign, room:myRoom, channel:myChannel }));
+    pingInterval = setInterval(() => { if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
+  };
+
+  ws.onmessage = (ev) => {
+    let msg; try{ msg=JSON.parse(ev.data); }catch{ return; }
+    handleServer(msg);
+  };
+
+  ws.onclose = () => {
+    setConn('error', 'OFFLINE');
+    clearInterval(pingInterval);
+    document.getElementById('reconnect-banner').classList.add('show');
+    // Riconnessione automatica
+    reconnectTimer = setTimeout(() => {
+      document.getElementById('reconnect-banner').classList.remove('show');
+      connectWS();
+    }, 4000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function handleServer(msg) {
+  switch(msg.type) {
+
+    case 'joined':
+      myId = msg.id;
+      showRadio();
+      setConn('connected', 'IN RETE');
+      document.getElementById('reconnect-banner').classList.remove('show');
+      // Costruiamo peers con chi è già connesso
+      msg.users.forEach(u => {
+        if (u.id !== myId) { users[u.id]={callsign:u.callsign,speaking:false}; createPeer(u.id,true); }
+      });
+      users[myId] = {callsign:myCallsign, speaking:false, isMe:true};
+      renderUsers();
+      logSys('Connesso — stanza: ' + myRoom + ' · ' + CH_LBLS[myChannel]);
+      if (msg.currentTx) setChannelBusy(true, msg.currentTx);
+      break;
+
+    case 'error':
+      alert(msg.message);
+      document.getElementById('join-btn').disabled = false;
+      document.getElementById('join-btn').textContent = 'ENTRA SUL CANALE ↗';
+      break;
+
+    case 'user_joined':
+      if (msg.id !== myId) {
+        users[msg.id] = {callsign:msg.callsign, speaking:false};
+        renderUsers();
+        logSys(msg.callsign + ' entrato sul canale');
+        createPeer(msg.id, false);
+      }
+      updateUsersCount(msg.users.length);
+      break;
+
+    case 'user_left':
+      logSys(msg.callsign + ' ha lasciato il canale');
+      closePeer(msg.id);
+      delete users[msg.id];
+      renderUsers();
+      updateUsersCount(msg.users.length);
+      if (currentSpeaker === msg.callsign) setChannelFree();
+      break;
+
+    case 'ptt_start':
+      if (msg.callsign !== myCallsign) {
+        setChannelBusy(true, msg.callsign);
+        setSpeaking(msg.id, true);
+        logTx(msg.callsign, '▶ ha premuto PTT');
+      } else {
+        // conferma TX
+        logTx(myCallsign, '▶ TRASMISSIONE IN CORSO');
+      }
+      break;
+
+    case 'ptt_stop':
+      if (msg.callsign !== myCallsign) {
+        setSpeaking(msg.id, false);
+        setChannelFree();
+        logTx(msg.callsign, '■ fine trasmissione');
+      }
+      break;
+
+    case 'ptt_denied':
+      isTx = false;
+      document.getElementById('ptt-btn').classList.remove('transmitting');
+      setPttStatus('⚠ Canale occupato da ' + msg.speaker);
+      break;
+
+    // ── WebRTC signaling ──────────────────────
+    case 'offer':
+      handleOffer(msg); break;
+    case 'answer':
+      handleAnswer(msg); break;
+    case 'ice-candidate':
+      handleIce(msg); break;
+  }
+}
+
+// ════════════════════════════════════════════════
+// WebRTC AUDIO (peer-to-peer)
+// ════════════════════════════════════════════════
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+};
+
+function createPeer(targetId, isInitiator) {
+  if (peers[targetId]) closePeer(targetId);
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  peers[targetId] = pc;
+
+  // Aggiungi traccia microfono (inizialmente silenziosa)
+  if (micStream) {
+    micStream.getAudioTracks().forEach(t => pc.addTrack(t, micStream));
+  }
+
+  // Ricezione audio remoto
+  pc.ontrack = (ev) => {
+    playRemoteAudio(ev.streams[0], targetId);
+  };
+
+  pc.onicecandidate = (ev) => {
+    if (ev.candidate) {
+      wsSend({ type:'ice-candidate', targetId, candidate: ev.candidate });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log(`[RTC] ${users[targetId]?.callsign} → ${pc.connectionState}`);
+  };
+
+  if (isInitiator) {
+    pc.createOffer().then(offer => {
+      pc.setLocalDescription(offer);
+      wsSend({ type:'offer', targetId, sdp: offer });
+    });
+  }
+}
+
+async function handleOffer(msg) {
+  const pc = peers[msg.fromId] || (() => { createPeer(msg.fromId, false); return peers[msg.fromId]; })();
+  await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  wsSend({ type:'answer', targetId: msg.fromId, sdp: answer });
+}
+
+async function handleAnswer(msg) {
+  const pc = peers[msg.fromId];
+  if (pc) await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+}
+
+async function handleIce(msg) {
+  const pc = peers[msg.fromId];
+  if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch{}
+}
+
+function closePeer(id) {
+  if (peers[id]) { peers[id].close(); delete peers[id]; }
+}
+
+function playRemoteAudio(stream, peerId) {
+  const audio = new Audio();
+  audio.srcObject = stream;
+  audio.volume = volGain;
+  audio.autoplay = true;
+  // Effetto radio: passa per BiquadFilter
+  applyRadioEffect(stream, audio);
+  document.getElementById('vol-range').addEventListener('input', function() {
+    audio.volume = this.value / 100;
+    volGain = audio.volume;
+  });
+}
+
+function applyRadioEffect(stream, audioEl) {
+  try {
+    const ctx = new AudioContext();
+    const src = ctx.createMediaStreamSource(stream);
+    // High-pass filter (taglia i bassi come una radio)
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 300;
+    // Low-pass (taglia gli alti)
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 3000;
+    // Gain
+    const gain = ctx.createGain(); gain.gain.value = volGain * 2.5;
+    const dest = ctx.createMediaStreamDestination();
+    src.connect(hp); hp.connect(lp); lp.connect(gain); gain.connect(dest);
+    audioEl.srcObject = dest.stream;
+  } catch(e) {
+    console.warn('[RadioFX]', e);
+  }
+}
+
+// ════════════════════════════════════════════════
+// PTT
+// ════════════════════════════════════════════════
+function pttDown(e) {
+  if (e) e.preventDefault();
+  if (isTx) return;
+  if (chanBusy && currentSpeaker !== myCallsign) {
+    setPttStatus('⚠ Canale occupato — attendere');
+    return;
+  }
+  isTx = true;
+  // Abilita microfono
+  if (micStream) micStream.getAudioTracks().forEach(t => t.enabled = true);
+  document.getElementById('ptt-btn').classList.add('transmitting');
+  setSpeaking(myId, true);
+  startMeter(true);
+  txStartTs = Date.now();
+  txTimerInt = setInterval(updateTxTimer, 100);
+  setPttStatus('▶ TRASMISSIONE IN CORSO...');
+  wsSend({ type:'ptt_start', callsign:myCallsign, room:myRoom, channel:myChannel });
+}
+
+function pttUp(e) {
+  if (e) e.preventDefault();
+  if (!isTx) return;
+  isTx = false;
+  // Disabilita microfono
+  if (micStream) micStream.getAudioTracks().forEach(t => t.enabled = false);
+  document.getElementById('ptt-btn').classList.remove('transmitting');
+  setSpeaking(myId, false);
+  stopMeter();
+  clearInterval(txTimerInt);
+  document.getElementById('tx-timer').textContent = '';
+  setChannelFree();
+  setPttStatus('Microfono pronto — premi PTT per trasmettere');
+  wsSend({ type:'ptt_stop', callsign:myCallsign, room:myRoom, channel:myChannel });
+}
+
+function setChannelBusy(busy, callsign) {
+  chanBusy = busy;
+  currentSpeaker = callsign;
+  const bar = document.getElementById('tx-bar');
+  const led = document.getElementById('tx-led');
+  const who = document.getElementById('tx-who');
+  if (busy) {
+    bar.classList.add('active');
+    led.classList.add('on');
+    who.classList.add('active');
+    who.textContent = '▶ RX — ' + callsign + ' IN TRASMISSIONE';
+    document.getElementById('ptt-btn').classList.add('locked');
+  }
+}
+
+function setChannelFree() {
+  chanBusy = false; currentSpeaker = null;
+  const bar=document.getElementById('tx-bar');
+  const led=document.getElementById('tx-led');
+  const who=document.getElementById('tx-who');
+  bar.classList.remove('active'); led.classList.remove('on');
+  who.classList.remove('active'); who.textContent = 'CANALE LIBERO';
+  document.getElementById('ptt-btn').classList.remove('locked');
+  document.getElementById('tx-timer').textContent = '';
+}
+
+function updateTxTimer() {
+  const s = ((Date.now()-txStartTs)/1000).toFixed(1);
+  document.getElementById('tx-timer').textContent = s+'s';
+}
+
+// ════════════════════════════════════════════════
+// AUDIO METER
+// ════════════════════════════════════════════════
+function startMeter(live) {
+  const fill = document.getElementById('meter-fill');
+  if (live && analyser) {
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    meterInt = setInterval(() => {
+      analyser.getByteFrequencyData(buf);
+      const avg = buf.reduce((a,b)=>a+b,0)/buf.length;
+      fill.style.width = Math.min(avg*2.5,100)+'%';
+    }, 50);
+  } else {
+    // Simulazione se no mic
+    meterInt = setInterval(() => {
+      fill.style.width = (Math.random()*70+20)+'%';
+    }, 80);
+  }
+}
+function stopMeter() {
+  clearInterval(meterInt);
+  document.getElementById('meter-fill').style.width = '0%';
+}
+
+// ════════════════════════════════════════════════
+// SIG BARS ANIMATION
+// ════════════════════════════════════════════════
+function startSigAnim() {
+  const bars = document.querySelectorAll('.sig-bar');
+  sigInt = setInterval(() => {
+    const lvl = chanBusy ? 4+Math.round(Math.random()) : 2+Math.floor(Math.random()*2);
+    bars.forEach((b,i) => b.classList.toggle('on', i<lvl));
+  }, chanBusy ? 120 : 2000);
+}
+
+// ════════════════════════════════════════════════
+// USERS
+// ════════════════════════════════════════════════
+function renderUsers() {
+  const grid = document.getElementById('users-grid');
+  grid.innerHTML = '';
+  Object.entries(users).forEach(([id,u]) => {
+    const chip = document.createElement('div');
+    chip.className = 'user-chip' + (u.speaking?' speaking':'') + (u.isMe?' me':'');
+    chip.id = 'chip-'+id;
+    chip.innerHTML = `<div class="u-av">${u.callsign.slice(0,2)}</div>${u.callsign}${u.isMe?' <small style="opacity:.5">(io)</small>':''}`;
+    grid.appendChild(chip);
+  });
+  updateUsersCount(Object.keys(users).length);
+}
+
+function setSpeaking(id, val) {
+  if (id === myId) {
+    // Aggiorna barra TX per se stessi
+    const bar=document.getElementById('tx-bar');
+    const led=document.getElementById('tx-led');
+    const who=document.getElementById('tx-who');
+    if (val) {
+      bar.classList.add('active'); led.classList.add('on');
+      who.classList.add('active');
+      who.textContent = '▶ TX — STAI TRASMETTENDO';
+    }
+  }
+  if (users[id]) { users[id].speaking = val; renderUsers(); }
+}
+
+function updateUsersCount(n) {
+  document.getElementById('users-count').textContent = n + (n===1?' utente':' utenti');
+}
+
+// ════════════════════════════════════════════════
+// LOG
+// ════════════════════════════════════════════════
+function addLog(cs, msg, cls='') {
+  const body = document.getElementById('log-body');
+  const t = new Date().toTimeString().slice(0,8);
+  const el = document.createElement('div');
+  el.className = 'log-entry ' + cls;
+  el.innerHTML = `<span class="log-t">${t}</span><span class="log-cs">${cs}</span><span class="log-m">${msg}</span>`;
+  body.appendChild(el);
+  body.scrollTop = body.scrollHeight;
+  document.getElementById('log-badge').textContent = (++logCount) + ' msg';
+}
+const logSys = (m) => addLog('SISTEMA', m, 'sys');
+const logTx  = (cs,m) => addLog(cs, m, 'tx');
+
+// ════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════
+function setConn(state, label) {
+  const pill = document.getElementById('conn-pill');
+  pill.className = 'conn-pill ' + state;
+  document.getElementById('conn-label').textContent = label;
+}
+function setPttStatus(t) { document.getElementById('ptt-status').textContent = t; }
+
+function wsSend(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+// ════════════════════════════════════════════════
+// KEYBOARD — BARRA SPAZIATRICE = PTT
+// ════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.code==='Space' && !e.repeat && document.getElementById('radio-screen').classList.contains('active')) {
+    e.preventDefault(); pttDown(null);
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code==='Space') { e.preventDefault(); pttUp(null); }
+});
+
+// ════════════════════════════════════════════════
+// INPUT SANITIZE
+// ════════════════════════════════════════════════
+['in-callsign','in-room'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function(){
+    this.value = this.value.toUpperCase().replace(/[^A-Z0-9\-_]/g,'');
+  });
+});
+
+// ════════════════════════════════════════════════
+// VOLUME SLIDER
+// ════════════════════════════════════════════════
+document.getElementById('vol-range').addEventListener('input', function() {
+  volGain = this.value / 100;
+});
+</script>
+</body>
+</html>
