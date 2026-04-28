@@ -121,8 +121,7 @@ html, body {
 .sig-bar:nth-child(1){height:5px} .sig-bar:nth-child(2){height:8px}
 .sig-bar:nth-child(3){height:12px} .sig-bar:nth-child(4){height:16px} .sig-bar:nth-child(5){height:20px}
 
-.freq-num  { font-family: var(--mono); font-size: 40px; color: var(--accent); letter-spacing: 4px; text-shadow: 0 0 24px rgba(61,220,132,.35); line-height: 1; }
-.freq-unit { font-family: var(--mono); font-size: 11px; color: #2a4a2a; letter-spacing: 3px; margin-top: 3px; }
+.freq-num  { font-family: var(--mono); font-size: 26px; color: var(--accent); letter-spacing: 1.5px; text-shadow: 0 0 24px rgba(61,220,132,.35); line-height: 1.1; word-break: break-all; }
 .disp-row3 { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .badge { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; padding: 2px 7px; border-radius: 3px; border: 1px solid; }
 .badge-ch  { color: var(--amber); border-color: var(--amber-dim); background: rgba(245,166,35,.07); }
@@ -259,7 +258,7 @@ html, body {
 .reconnect-banner.show { display: block; }
 
 @media(max-width:400px){
-  .freq-num{font-size:32px}
+  .freq-num{font-size:22px}
   .ptt-btn{width:148px;height:148px}
 }
 </style>
@@ -287,10 +286,10 @@ html, body {
   <div class="field">
     <div class="field-label">CANALE</div>
     <select id="in-channel">
-      <option value="1">CH 01 — 145.500 MHz  (Chiamata)</option>
-      <option value="2">CH 02 — 145.575 MHz  (Operativo)</option>
-      <option value="3">CH 03 — 433.500 MHz  (Emergenza)</option>
-      <option value="4">CH 04 — 446.000 MHz  (Formazione)</option>
+      <option value="1">CH 01 — Fir-Dig-1_slot_A</option>
+      <option value="2">CH 02 — Fir-Dig-1_slot_B</option>
+      <option value="3">CH 03 — Fir-Dig-2_slot_A</option>
+      <option value="4">CH 04 — Fir-Dig-2_slot_B</option>
     </select>
   </div>
   <div class="field">
@@ -328,8 +327,7 @@ html, body {
           <div class="sig-bar on"></div><div class="sig-bar"></div><div class="sig-bar"></div>
         </div>
       </div>
-      <div class="freq-num" id="freq-num">145.500</div>
-      <div class="freq-unit">MHz — FM  NARROW</div>
+      <div class="freq-num" id="freq-num">Fir-Dig-1_slot_A</div>
       <div class="disp-row3">
         <span class="badge badge-ch" id="badge-ch">CH 01</span>
         <span class="badge badge-sq">SQL 5</span>
@@ -419,7 +417,7 @@ function getWsUrl() {
   return `${proto}//${location.host}`;
 }
 
-const FREQS    = {'1':'145.500','2':'145.575','3':'433.500','4':'446.000'};
+const CH_NAMES = {'1':'Fir-Dig-1_slot_A','2':'Fir-Dig-1_slot_B','3':'Fir-Dig-2_slot_A','4':'Fir-Dig-2_slot_B'};
 const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};
 
 // ════════════════════════════════════════════════
@@ -458,7 +456,7 @@ function showRadio() {
   document.getElementById('join-screen').style.display = 'none';
   document.getElementById('radio-screen').classList.add('active');
   document.getElementById('my-cs').textContent = myCallsign;
-  document.getElementById('freq-num').textContent = FREQS[myChannel];
+  document.getElementById('freq-num').textContent = CH_NAMES[myChannel];
   document.getElementById('badge-ch').textContent = CH_LBLS[myChannel];
   startSigAnim();
 }
