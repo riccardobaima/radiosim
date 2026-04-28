@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d0f0e">
+<link rel="icon" type="image/png" href="fir-logo.png">
+<link rel="apple-touch-icon" href="fir-logo.png">
 <title>RadioSim — Simulatore Radio VHF/UHF</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
@@ -44,10 +46,9 @@ html, body {
   display: flex; align-items: center; gap: 12px;
   margin-bottom: 20px; width: 100%; max-width: 480px;
 }
-.logo-badge {
-  background: var(--accent); color: #000;
-  font-family: var(--sans); font-weight: 700; font-size: 11px;
-  letter-spacing: 2px; padding: 4px 8px; border-radius: 3px;
+.logo-img {
+  height: 42px; width: auto; display: block;
+  flex-shrink: 0;
 }
 .header h1 { font-family: var(--sans); font-weight: 700; font-size: 20px; letter-spacing: 2px; }
 .conn-pill {
@@ -266,7 +267,7 @@ html, body {
 <body>
 
 <div class="header">
-  <span class="logo-badge">VHF/UHF</span>
+  <img class="logo-img" src="fir-logo.png" alt="FIR CB Servizio Emergenza Radio">
   <h1>RADIOSIM</h1>
   <div class="conn-pill" id="conn-pill">
     <div class="conn-dot"></div>
