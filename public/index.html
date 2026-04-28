@@ -50,7 +50,9 @@ html, body {
   height: 42px; width: auto; display: block;
   flex-shrink: 0;
 }
-.header h1 { font-family: var(--sans); font-weight: 700; font-size: 20px; letter-spacing: 2px; }
+.header h1 { font-family: var(--sans); font-weight: 700; font-size: 20px; letter-spacing: 2px; line-height: 1; }
+.header-title { display: flex; flex-direction: column; gap: 2px; }
+.app-version { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 1px; }
 .conn-pill {
   margin-left: auto;
   display: flex; align-items: center; gap: 6px;
@@ -308,7 +310,10 @@ html, body {
 
 <div class="header">
   <img class="logo-img" src="fir-logo.png" alt="FIR CB Servizio Emergenza Radio">
-  <h1>RADIOSIM</h1>
+  <div class="header-title">
+    <h1>RADIOSIM</h1>
+    <span class="app-version" id="app-version">v…</span>
+  </div>
   <div class="conn-pill" id="conn-pill">
     <div class="conn-dot"></div>
     <span id="conn-label">OFFLINE</span>
@@ -471,6 +476,15 @@ function getWsUrl() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${location.host}`;
 }
+
+// Versione: caricata dal server, mostrata nell'header
+fetch('/version')
+  .then(r => r.json())
+  .then(d => {
+    const el = document.getElementById('app-version');
+    if (el && d.version) el.textContent = 'v' + d.version;
+  })
+  .catch(() => {});
 
 const CH_NAMES = {'1':'Fir-Dig-1_slot_A','2':'Fir-Dig-1_slot_B','3':'Fir-Dig-2_slot_A','4':'Fir-Dig-2_slot_B'};
 const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};

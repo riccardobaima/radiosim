@@ -8,6 +8,21 @@ const http    = require('http');
 const { WebSocketServer, WebSocket } = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path    = require('path');
+const { execSync } = require('child_process');
+
+// ─────────────────────────────────────────────
+// Versione app: usa il commit SHA iniettato da Railway,
+// fallback a git locale, fallback a 'dev'
+// ─────────────────────────────────────────────
+let APP_VERSION = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || '';
+if (APP_VERSION) {
+  APP_VERSION = APP_VERSION.slice(0, 7);
+} else {
+  try { APP_VERSION = execSync('git rev-parse --short HEAD').toString().trim(); }
+  catch { APP_VERSION = 'dev'; }
+}
+const BUILD_TIME = new Date().toISOString();
+console.log(`[VERSION] ${APP_VERSION} (build: ${BUILD_TIME})`);
 
 const app    = express();
 const server = http.createServer(app);
@@ -334,8 +349,15 @@ app.use(express.static(path.join(__dirname, '../public')));
 // Health check per Railway
 app.get('/health', (_, res) => res.json({
   status: 'ok',
+  version: APP_VERSION,
   rooms: rooms.size,
   uptime: Math.floor(process.uptime())
+}));
+
+// Versione corrente — usata dal frontend per mostrare la build attiva
+app.get('/version', (_, res) => res.json({
+  version: APP_VERSION,
+  builtAt: BUILD_TIME
 }));
 
 // Rooms status (debug)
