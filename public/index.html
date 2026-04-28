@@ -574,7 +574,14 @@ function handleServer(msg) {
 
     case 'ptt_denied':
       isTx = false;
+      // Race condition: il mic era stato abilitato in pttDown prima della risposta.
+      // Lo richiudiamo subito per evitare leak audio finché l'utente non rilascia.
+      if (micStream) micStream.getAudioTracks().forEach(t => t.enabled = false);
       document.getElementById('ptt-btn').classList.remove('transmitting');
+      setSpeaking(myId, false);
+      stopMeter();
+      clearInterval(txTimerInt);
+      document.getElementById('tx-timer').textContent = '';
       setPttStatus('⚠ Canale occupato da ' + msg.speaker);
       break;
 
