@@ -521,9 +521,8 @@ function showRadio() {
 function doLogout() {
   if (!confirm('Disconnettersi dal canale?')) return;
 
-  // Blocca riconnessione automatica
-  authFailed = true;
-  if (reconnectTimer) clearTimeout(reconnectTimer);
+  // Cancella riconnessione eventualmente in corso e timer
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (pingInterval)   clearInterval(pingInterval);
   if (txTimerInt)     clearInterval(txTimerInt);
   if (sigInt)         clearInterval(sigInt);
@@ -540,8 +539,13 @@ function doLogout() {
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   if (audioCtx)  { try { audioCtx.close(); } catch{} audioCtx = null; }
 
-  // Chiudi WebSocket
-  if (ws) { try { ws.close(); } catch{} ws = null; }
+  // Chiudi WebSocket — rimuovi gli handler PRIMA di close() per evitare
+  // che l'onclose asincrono inneschi la riconnessione automatica
+  if (ws) {
+    ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null;
+    try { ws.close(); } catch{}
+    ws = null;
+  }
 
   // Reset stato
   users = {}; myId = ''; isAdmin = false;
@@ -570,9 +574,6 @@ function doLogout() {
   // Pulisci campi password (ma lascia callsign/stanza/canale per comodità)
   document.getElementById('in-password').value = '';
   document.getElementById('in-admin-password').value = '';
-
-  // Reset flag per consentire nuovo login
-  authFailed = false;
 }
 
 // ════════════════════════════════════════════════
