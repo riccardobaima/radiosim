@@ -59,6 +59,7 @@ html, body {
   font-family: var(--mono); font-size: 10px; color: var(--text-dim);
   transition: all 0.3s;
 }
+.logout-btn { margin-left: 0; }
 .conn-pill.connected { border-color: var(--accent-dim); color: var(--accent); }
 .conn-pill.error     { border-color: var(--tx-dim);     color: var(--tx); }
 .conn-dot {
@@ -67,6 +68,15 @@ html, body {
 }
 .conn-pill.connected .conn-dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
 .conn-pill.error     .conn-dot { background: var(--tx); }
+.logout-btn {
+  display: none;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); font-family: var(--mono); font-size: 10px;
+  letter-spacing: 2px; padding: 5px 11px; border-radius: 4px;
+  cursor: pointer; transition: all .15s;
+}
+.logout-btn:hover { color: var(--tx); border-color: var(--tx-dim); }
+.logout-btn.show { display: inline-block; }
 
 /* ── JOIN SCREEN ─────────────────────────── */
 #join-screen { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 18px; }
@@ -303,6 +313,7 @@ html, body {
     <div class="conn-dot"></div>
     <span id="conn-label">OFFLINE</span>
   </div>
+  <button id="logout-btn" class="logout-btn" onclick="doLogout()" title="Disconnetti">ESCI</button>
 </div>
 
 <!-- ══ JOIN SCREEN ══════════════════════════ -->
@@ -500,10 +511,68 @@ async function doJoin() {
 function showRadio() {
   document.getElementById('join-screen').style.display = 'none';
   document.getElementById('radio-screen').classList.add('active');
+  document.getElementById('logout-btn').classList.add('show');
   document.getElementById('my-cs').textContent = myCallsign;
   document.getElementById('freq-num').textContent = CH_NAMES[myChannel];
   document.getElementById('badge-ch').textContent = CH_LBLS[myChannel];
   startSigAnim();
+}
+
+function doLogout() {
+  if (!confirm('Disconnettersi dal canale?')) return;
+
+  // Blocca riconnessione automatica
+  authFailed = true;
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  if (pingInterval)   clearInterval(pingInterval);
+  if (txTimerInt)     clearInterval(txTimerInt);
+  if (sigInt)         clearInterval(sigInt);
+  if (meterInt)       clearInterval(meterInt);
+
+  // Stop TX se attivo
+  if (isTx && micStream) micStream.getAudioTracks().forEach(t => t.enabled = false);
+  isTx = false;
+
+  // Chiudi peer connections
+  Object.keys(peers).forEach(closePeer);
+
+  // Rilascia microfono
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (audioCtx)  { try { audioCtx.close(); } catch{} audioCtx = null; }
+
+  // Chiudi WebSocket
+  if (ws) { try { ws.close(); } catch{} ws = null; }
+
+  // Reset stato
+  users = {}; myId = ''; isAdmin = false;
+  chanBusy = false; currentSpeaker = null; logCount = 0;
+
+  // Reset UI
+  document.getElementById('radio-screen').classList.remove('active');
+  document.getElementById('join-screen').style.display = '';
+  document.getElementById('logout-btn').classList.remove('show');
+  document.getElementById('admin-kill-btn').classList.remove('show');
+  document.getElementById('reconnect-banner').classList.remove('show');
+  document.getElementById('join-btn').disabled = false;
+  document.getElementById('join-btn').textContent = 'ENTRA SUL CANALE ↗';
+  setConn('', 'OFFLINE');
+  document.getElementById('log-body').innerHTML = '';
+  document.getElementById('log-badge').textContent = '0 msg';
+  document.getElementById('users-grid').innerHTML = '';
+  document.getElementById('users-count').textContent = '0';
+  document.getElementById('tx-bar').classList.remove('active');
+  document.getElementById('tx-led').classList.remove('on');
+  document.getElementById('tx-who').classList.remove('active');
+  document.getElementById('tx-who').textContent = 'CANALE LIBERO';
+  document.getElementById('ptt-btn').classList.remove('transmitting','locked');
+  document.getElementById('meter-fill').style.width = '0%';
+
+  // Pulisci campi password (ma lascia callsign/stanza/canale per comodità)
+  document.getElementById('in-password').value = '';
+  document.getElementById('in-admin-password').value = '';
+
+  // Reset flag per consentire nuovo login
+  authFailed = false;
 }
 
 // ════════════════════════════════════════════════
