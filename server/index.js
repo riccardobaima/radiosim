@@ -13,7 +13,37 @@ const app    = express();
 const server = http.createServer(app);
 const wss    = new WebSocketServer({ server });
 
-const PORT = process.env.PORT || 3000;
+const PORT            = process.env.PORT || 3000;
+const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || '';
+const AUTH_ENABLED    = ACCESS_PASSWORD.length > 0;
+
+if (AUTH_ENABLED) console.log('[AUTH] Codice di accesso ATTIVO');
+else              console.log('[AUTH] Nessun codice — accesso libero (dev mode)');
+
+// ─────────────────────────────────────────────
+// Rate limit per password sbagliate (per IP)
+// ─────────────────────────────────────────────
+const RL_MAX        = 5;          // tentativi falliti
+const RL_WINDOW_MS  = 60_000;     // finestra di 60 s
+const failedAttempts = new Map(); // ip -> { count, resetAt }
+
+function checkRate(ip) {
+  const now = Date.now();
+  const e = failedAttempts.get(ip);
+  if (!e || now > e.resetAt) return true;
+  return e.count < RL_MAX;
+}
+function recordFail(ip) {
+  const now = Date.now();
+  const e = failedAttempts.get(ip);
+  if (!e || now > e.resetAt) failedAttempts.set(ip, { count: 1, resetAt: now + RL_WINDOW_MS });
+  else e.count++;
+}
+// Pulizia periodica
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, e] of failedAttempts) if (now > e.resetAt) failedAttempts.delete(ip);
+}, RL_WINDOW_MS);
 
 // ─────────────────────────────────────────────
 // Stato globale
@@ -66,8 +96,11 @@ function getUserList(room, channel) {
 // ─────────────────────────────────────────────
 // WebSocket handler
 // ─────────────────────────────────────────────
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   let meta = null;
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+           || req.socket.remoteAddress
+           || 'unknown';
 
   ws.on('message', (raw) => {
     let msg;
@@ -77,8 +110,23 @@ wss.on('connection', (ws) => {
 
       // ── JOIN ───────────────────────────────
       case 'join': {
-        const { callsign, room, channel } = msg;
+        const { callsign, room, channel, password } = msg;
         if (!callsign || !room || !channel) return;
+
+        if (AUTH_ENABLED) {
+          if (!checkRate(ip)) {
+            ws.send(JSON.stringify({ type: 'error', code: 'RATE_LIMIT',
+              message: 'Troppi tentativi. Attendi un minuto e riprova.' }));
+            return;
+          }
+          if (password !== ACCESS_PASSWORD) {
+            recordFail(ip);
+            console.log(`[AUTH] Tentativo fallito da ${ip} (callsign: ${callsign})`);
+            ws.send(JSON.stringify({ type: 'error', code: 'WRONG_PASSWORD',
+              message: 'Codice di accesso non valido.' }));
+            return;
+          }
+        }
 
         meta = { id: uuidv4(), callsign, room, channel };
         const r = getOrCreateRoom(room, channel);

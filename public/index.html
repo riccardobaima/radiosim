@@ -297,6 +297,10 @@ html, body {
     <div class="field-label">STANZA / SESSIONE</div>
     <input id="in-room" type="text" value="FORMAZIONE-01" maxlength="24" autocomplete="off" spellcheck="false">
   </div>
+  <div class="field">
+    <div class="field-label">CODICE ACCESSO</div>
+    <input id="in-password" type="password" placeholder="codice fornito dal coordinatore" maxlength="64" autocomplete="off" spellcheck="false">
+  </div>
 
   <button class="join-btn" id="join-btn" onclick="doJoin()">ENTRA SUL CANALE ↗</button>
 
@@ -421,8 +425,8 @@ const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};
 // ════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════
-let myCallsign='', myChannel='1', myRoom='', myId='';
-let ws=null, reconnectTimer=null, pingInterval=null;
+let myCallsign='', myChannel='1', myRoom='', myPassword='', myId='';
+let ws=null, reconnectTimer=null, pingInterval=null, authFailed=false;
 let audioCtx=null, analyser=null, micStream=null;
 let peers={}; // id -> RTCPeerConnection
 let users={}; // id -> {callsign, speaking}
@@ -440,7 +444,9 @@ async function doJoin() {
   myCallsign = cs;
   myChannel  = document.getElementById('in-channel').value;
   myRoom     = document.getElementById('in-room').value.trim().toUpperCase() || 'FORMAZIONE-01';
+  myPassword = document.getElementById('in-password').value;
 
+  authFailed = false;
   document.getElementById('join-btn').disabled = true;
   document.getElementById('join-btn').textContent = 'CONNESSIONE IN CORSO...';
 
@@ -487,7 +493,7 @@ function connectWS() {
 
   ws.onopen = () => {
     setConn('connecting', 'CONNESSIONE...');
-    ws.send(JSON.stringify({ type:'join', callsign:myCallsign, room:myRoom, channel:myChannel }));
+    ws.send(JSON.stringify({ type:'join', callsign:myCallsign, room:myRoom, channel:myChannel, password:myPassword }));
     pingInterval = setInterval(() => { if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
   };
 
@@ -499,8 +505,9 @@ function connectWS() {
   ws.onclose = () => {
     setConn('error', 'OFFLINE');
     clearInterval(pingInterval);
+    // Niente riconnessione se la password è sbagliata: l'utente deve correggerla
+    if (authFailed) return;
     document.getElementById('reconnect-banner').classList.add('show');
-    // Riconnessione automatica
     reconnectTimer = setTimeout(() => {
       document.getElementById('reconnect-banner').classList.remove('show');
       connectWS();
@@ -532,6 +539,14 @@ function handleServer(msg) {
       alert(msg.message);
       document.getElementById('join-btn').disabled = false;
       document.getElementById('join-btn').textContent = 'ENTRA SUL CANALE ↗';
+      // Per errori di autenticazione blocchiamo la riconnessione automatica
+      if (msg.code === 'WRONG_PASSWORD' || msg.code === 'RATE_LIMIT') {
+        authFailed = true;
+        if (msg.code === 'WRONG_PASSWORD') {
+          const pw = document.getElementById('in-password');
+          pw.value = ''; pw.focus();
+        }
+      }
       break;
 
     case 'user_joined':
