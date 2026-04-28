@@ -888,6 +888,12 @@ async function getRxCtx() {
   return rxAudioCtx;
 }
 
+// Effetto radio (filtro 300-3000 Hz) attivo solo se ?radiofx=1 in URL.
+// Disattivato di default: il filtro si è rivelato inaffidabile su alcuni
+// browser (audio negoziato ma silenzioso). Senza filtro è audio "pulito"
+// ma garantito che si senta.
+const RADIO_FX = new URLSearchParams(location.search).has('radiofx');
+
 async function playRemoteAudio(stream, peerId) {
   // Riusa l'elemento <audio> per peer se esiste già (es. dopo rinegoziazione)
   let audio = document.getElementById('aud-' + peerId);
@@ -896,13 +902,19 @@ async function playRemoteAudio(stream, peerId) {
     audio.id = 'aud-' + peerId;
     audio.autoplay = true;
     audio.playsInline = true;
-    audio.style.display = 'none';
+    // Non display:none su iOS: alcuni browser lo trattano come "non rendered"
+    // e bloccano l'audio. Lo nascondiamo fuori viewport invece.
+    audio.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;';
     document.body.appendChild(audio);
   }
+  // Sempre la traccia raw, così è sicuro che si senta.
+  audio.srcObject = stream;
   audio.volume = volGain;
-  // Prova ad applicare l'effetto radio; se fallisce, fallback alla traccia raw
-  const ok = await applyRadioEffect(stream, audio);
-  if (!ok) audio.srcObject = stream;
+  audio.muted = false;
+
+  // Effetto radio opzionale (sopra alla traccia raw)
+  if (RADIO_FX) await applyRadioEffect(stream, audio);
+
   const cs = users[peerId]?.callsign || peerId.slice(0,6);
   try {
     await audio.play();
