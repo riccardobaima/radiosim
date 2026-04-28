@@ -774,6 +774,8 @@ function createPeer(targetId, isInitiator) {
 
   // Ricezione audio remoto
   pc.ontrack = (ev) => {
+    const cs = users[targetId]?.callsign || targetId.slice(0,6);
+    logSys('📡 Traccia audio ricevuta da ' + cs);
     playRemoteAudio(ev.streams[0], targetId);
   };
 
@@ -784,7 +786,11 @@ function createPeer(targetId, isInitiator) {
   };
 
   pc.onconnectionstatechange = () => {
-    console.log(`[RTC] ${users[targetId]?.callsign} → ${pc.connectionState}`);
+    const cs = users[targetId]?.callsign || targetId.slice(0,6);
+    console.log(`[RTC] ${cs} → ${pc.connectionState}`);
+    if (pc.connectionState === 'connected')      logSys('🔗 P2P attivo con ' + cs);
+    else if (pc.connectionState === 'failed')    logSys('⚠ P2P fallito con ' + cs + ' (probabile firewall/NAT)');
+    else if (pc.connectionState === 'disconnected') logSys('… P2P disconnesso da ' + cs);
   };
 
   if (isInitiator) {
@@ -826,15 +832,17 @@ function closePeer(id) {
 // agganciato a un user gesture (resume() esplicito) per evitare lo stato
 // "suspended" che Chrome impone ai contesti creati fuori da una gesture.
 let rxAudioCtx = null;
-function getRxCtx() {
+async function getRxCtx() {
   if (!rxAudioCtx) {
     rxAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if (rxAudioCtx.state === 'suspended') rxAudioCtx.resume().catch(()=>{});
+  if (rxAudioCtx.state === 'suspended') {
+    try { await rxAudioCtx.resume(); } catch{}
+  }
   return rxAudioCtx;
 }
 
-function playRemoteAudio(stream, peerId) {
+async function playRemoteAudio(stream, peerId) {
   // Riusa l'elemento <audio> per peer se esiste già (es. dopo rinegoziazione)
   let audio = document.getElementById('aud-' + peerId);
   if (!audio) {
@@ -847,14 +855,21 @@ function playRemoteAudio(stream, peerId) {
   }
   audio.volume = volGain;
   // Prova ad applicare l'effetto radio; se fallisce, fallback alla traccia raw
-  const ok = applyRadioEffect(stream, audio);
+  const ok = await applyRadioEffect(stream, audio);
   if (!ok) audio.srcObject = stream;
-  audio.play().catch(e => console.warn('[AUDIO] play() bloccato:', e.message));
+  const cs = users[peerId]?.callsign || peerId.slice(0,6);
+  try {
+    await audio.play();
+    logSys('🔊 Audio pronto da ' + cs);
+  } catch (e) {
+    logSys('⚠ Autoplay bloccato per ' + cs + ' — tocca lo schermo');
+    console.warn('[AUDIO] play() bloccato:', e.message);
+  }
 }
 
-function applyRadioEffect(stream, audioEl) {
+async function applyRadioEffect(stream, audioEl) {
   try {
-    const ctx = getRxCtx();
+    const ctx = await getRxCtx();
     const src = ctx.createMediaStreamSource(stream);
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 300;
