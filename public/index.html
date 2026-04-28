@@ -544,14 +544,10 @@ function showRadio() {
 let wakeLock = null;
 
 async function requestWakeLock() {
-  if (!('wakeLock' in navigator)) {
-    logSys('ℹ Wake Lock non supportata — tieni lo schermo acceso manualmente');
-    return;
-  }
+  if (!('wakeLock' in navigator)) return;
   try {
     wakeLock = await navigator.wakeLock.request('screen');
     wakeLock.addEventListener('release', () => { wakeLock = null; });
-    logSys('🔆 Schermo bloccato attivo (no standby)');
   } catch (e) {
     console.warn('[WakeLock]', e.message);
   }
@@ -676,14 +672,9 @@ function connectWS() {
     handleServer(msg);
   };
 
-  ws.onclose = (ev) => {
+  ws.onclose = () => {
     setConn('error', 'OFFLINE');
     clearInterval(pingInterval);
-    // Diagnostica: codice chiusura WebSocket
-    // 1000=normale 1001=going-away(standby) 1005=no-status 1006=abnormal(rete) 1011=server-error
-    if (document.getElementById('radio-screen').classList.contains('active')) {
-      logSys(`⚠ WS chiuso code:${ev.code} clean:${ev.wasClean}${ev.reason?' reason:'+ev.reason:''}`);
-    }
     // Niente riconnessione se la password è sbagliata: l'utente deve correggerla
     if (authFailed) return;
     document.getElementById('reconnect-banner').classList.add('show');
@@ -834,8 +825,6 @@ function createPeer(targetId, isInitiator) {
 
   // Ricezione audio remoto
   pc.ontrack = (ev) => {
-    const cs = users[targetId]?.callsign || targetId.slice(0,6);
-    logSys('📡 Traccia audio ricevuta da ' + cs);
     playRemoteAudio(ev.streams[0], targetId);
   };
 
@@ -846,11 +835,7 @@ function createPeer(targetId, isInitiator) {
   };
 
   pc.onconnectionstatechange = () => {
-    const cs = users[targetId]?.callsign || targetId.slice(0,6);
-    console.log(`[RTC] ${cs} → ${pc.connectionState}`);
-    if (pc.connectionState === 'connected')      logSys('🔗 P2P attivo con ' + cs);
-    else if (pc.connectionState === 'failed')    logSys('⚠ P2P fallito con ' + cs + ' (probabile firewall/NAT)');
-    else if (pc.connectionState === 'disconnected') logSys('… P2P disconnesso da ' + cs);
+    console.log(`[RTC] ${users[targetId]?.callsign} → ${pc.connectionState}`);
   };
 
   if (isInitiator) {
@@ -929,12 +914,9 @@ async function playRemoteAudio(stream, peerId) {
   // Effetto radio opzionale (sopra alla traccia raw)
   if (RADIO_FX) await applyRadioEffect(stream, audio);
 
-  const cs = users[peerId]?.callsign || peerId.slice(0,6);
   try {
     await audio.play();
-    logSys('🔊 Audio pronto da ' + cs);
   } catch (e) {
-    logSys('⚠ Autoplay bloccato per ' + cs + ' — tocca lo schermo');
     console.warn('[AUDIO] play() bloccato:', e.message);
   }
 }
