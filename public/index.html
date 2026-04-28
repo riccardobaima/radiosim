@@ -505,6 +505,9 @@ async function doJoin() {
   document.getElementById('join-btn').textContent = 'CONNESSIONE IN CORSO...';
 
   await initMic();
+  // Sblocca subito il contesto audio di RX dentro la user gesture (click ENTRA),
+  // così quando arriverà la traccia remota potrà partire senza autoplay block.
+  try { getRxCtx(); } catch{}
   connectWS();
 }
 
@@ -535,9 +538,12 @@ function doLogout() {
   // Chiudi peer connections
   Object.keys(peers).forEach(closePeer);
 
-  // Rilascia microfono
+  // Rilascia microfono e contesti audio
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-  if (audioCtx)  { try { audioCtx.close(); } catch{} audioCtx = null; }
+  if (audioCtx)  { try { audioCtx.close();   } catch{} audioCtx   = null; }
+  if (rxAudioCtx){ try { rxAudioCtx.close(); } catch{} rxAudioCtx = null; }
+  // Rimuovi gli <audio> peer rimasti
+  document.querySelectorAll('audio[id^="aud-"]').forEach(a => a.remove());
 
   // Chiudi WebSocket — rimuovi gli handler PRIMA di close() per evitare
   // che l'onclose asincrono inneschi la riconnessione automatica
@@ -809,38 +815,59 @@ async function handleIce(msg) {
 
 function closePeer(id) {
   if (peers[id]) { peers[id].close(); delete peers[id]; }
+  const audio = document.getElementById('aud-' + id);
+  if (audio) {
+    try { audio.srcObject = null; } catch{}
+    audio.remove();
+  }
+}
+
+// AudioContext condiviso per i filtri radio — creato lazy al primo uso e
+// agganciato a un user gesture (resume() esplicito) per evitare lo stato
+// "suspended" che Chrome impone ai contesti creati fuori da una gesture.
+let rxAudioCtx = null;
+function getRxCtx() {
+  if (!rxAudioCtx) {
+    rxAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (rxAudioCtx.state === 'suspended') rxAudioCtx.resume().catch(()=>{});
+  return rxAudioCtx;
 }
 
 function playRemoteAudio(stream, peerId) {
-  const audio = new Audio();
-  audio.srcObject = stream;
+  // Riusa l'elemento <audio> per peer se esiste già (es. dopo rinegoziazione)
+  let audio = document.getElementById('aud-' + peerId);
+  if (!audio) {
+    audio = document.createElement('audio');
+    audio.id = 'aud-' + peerId;
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.style.display = 'none';
+    document.body.appendChild(audio);
+  }
   audio.volume = volGain;
-  audio.autoplay = true;
-  // Effetto radio: passa per BiquadFilter
-  applyRadioEffect(stream, audio);
-  document.getElementById('vol-range').addEventListener('input', function() {
-    audio.volume = this.value / 100;
-    volGain = audio.volume;
-  });
+  // Prova ad applicare l'effetto radio; se fallisce, fallback alla traccia raw
+  const ok = applyRadioEffect(stream, audio);
+  if (!ok) audio.srcObject = stream;
+  audio.play().catch(e => console.warn('[AUDIO] play() bloccato:', e.message));
 }
 
 function applyRadioEffect(stream, audioEl) {
   try {
-    const ctx = new AudioContext();
+    const ctx = getRxCtx();
     const src = ctx.createMediaStreamSource(stream);
-    // High-pass filter (taglia i bassi come una radio)
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 300;
-    // Low-pass (taglia gli alti)
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass'; lp.frequency.value = 3000;
-    // Gain
-    const gain = ctx.createGain(); gain.gain.value = volGain * 2.5;
+    const gain = ctx.createGain(); gain.gain.value = 2.5;
     const dest = ctx.createMediaStreamDestination();
     src.connect(hp); hp.connect(lp); lp.connect(gain); gain.connect(dest);
     audioEl.srcObject = dest.stream;
+    return true;
   } catch(e) {
     console.warn('[RadioFX]', e);
+    return false;
   }
 }
 
@@ -1059,10 +1086,11 @@ document.addEventListener('keyup', e => {
 });
 
 // ════════════════════════════════════════════════
-// VOLUME SLIDER
+// VOLUME SLIDER — applica a tutti gli <audio> peer attivi
 // ════════════════════════════════════════════════
 document.getElementById('vol-range').addEventListener('input', function() {
   volGain = this.value / 100;
+  document.querySelectorAll('audio[id^="aud-"]').forEach(a => { a.volume = volGain; });
 });
 </script>
 </body>
