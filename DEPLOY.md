@@ -69,9 +69,23 @@ git push -u origin main
 
 ---
 
-### PASSO 4 — Condividi con i volontari
+### PASSO 4 — Imposta i codici di accesso (Variables)
 
-Invia ai volontari il link Railway. Niente da installare:
+Vai su Railway → progetto `radiosim` → tab **"Variables"** e aggiungi:
+
+| Variabile | Obbligatoria | Cosa fa |
+|-----------|:-:|---------|
+| `ACCESS_PASSWORD` | sì (in produzione) | Codice di accesso per i volontari. Senza questa variabile l'accesso è libero (modalità dev). |
+| `ADMIN_PASSWORD` | facoltativa | Abilita il ruolo admin (vedi sezione dedicata sotto). Se non impostata, nessuno può entrare come admin. |
+| `ADMIN_CALLSIGN` | facoltativa | Nominativo che identifica l'admin. Default: `ADMIN`. |
+
+> ⚠️ **Attenzione**: dopo aver salvato una variabile, Railway riavvia automaticamente il servizio (~30 s). Controlla che non ci siano spazi accidentali a inizio/fine quando incolli il valore.
+
+---
+
+### PASSO 5 — Condividi con i volontari
+
+Invia ai volontari il link Railway + il `ACCESS_PASSWORD` che hai impostato. Niente da installare:
 - Su **PC/Mac**: apri il link in Chrome o Firefox
 - Su **Android**: apri in Chrome → "Aggiungi alla schermata Home" per installarlo come app
 - Su **iPhone**: apri in Safari → "Aggiungi a Home" per installarlo come app
@@ -130,14 +144,7 @@ Per gestire situazioni in cui un volontario tiene il PTT premuto per errore o pe
 
 ### Come si attiva
 
-Imposta su Railway (Variables) la variabile d'ambiente:
-
-| Variabile | Valore | Note |
-|-----------|--------|------|
-| `ADMIN_PASSWORD` | password a tua scelta | obbligatoria per attivare la funzione |
-| `ADMIN_CALLSIGN` | `ADMIN` | facoltativa (default: `ADMIN`) |
-
-Senza `ADMIN_PASSWORD` la funzione admin è **disattivata** e nessuno può entrare con il nominativo admin.
+Imposta `ADMIN_PASSWORD` (e opzionalmente `ADMIN_CALLSIGN`) su Railway → vedi **PASSO 4** sopra. Senza `ADMIN_PASSWORD` la funzione admin è **disattivata** e nessuno può entrare con il nominativo admin.
 
 ### Come si usa
 
@@ -184,7 +191,12 @@ Tutti gli utenti del canale vedono il badge `ADMIN` accanto al nominativo del co
 → Un altro volontario ha già usato quel callsign nella stessa stanza. Cambia nominativo.
 
 **Audio distorto o assente**
-→ Ricarica la pagina. Su Safari iOS potrebbe servire un tap sulla pagina prima che l'audio si attivi.
+→ Ricarica la pagina (Ctrl+F5 su PC) per essere sicuro di avere l'ultima versione. Verifica che lo slider VOLUME RICEZIONE non sia a zero e che il volume del dispositivo/browser sia alto.
+→ Su Safari iOS: tocca un punto qualsiasi della pagina dopo essere entrato nel canale per sbloccare l'audio. Disattiva la modalità silenzioso del telefono.
+→ Se non si sente nulla con 2+ utenti: aprire la console (F12 su PC) e cercare errori in rosso — segnalali per supporto.
+
+**"Codice di accesso non valido" anche se è giusto**
+→ Verifica che la variabile su Railway non abbia spazi accidentali a inizio/fine quando l'hai incollata. Le password sono case-sensitive. Dopo 5 tentativi errati il server blocca l'IP per 60 secondi (rate limit anti brute-force).
 
 **Latenza alta**
 → WebRTC usa STUN per connettersi direttamente. In rari casi (firewall aziendali) serve un server TURN — contattaci per la configurazione.
