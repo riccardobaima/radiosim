@@ -662,9 +662,14 @@ function connectWS() {
     handleServer(msg);
   };
 
-  ws.onclose = () => {
+  ws.onclose = (ev) => {
     setConn('error', 'OFFLINE');
     clearInterval(pingInterval);
+    // Diagnostica: codice chiusura WebSocket
+    // 1000=normale 1001=going-away(standby) 1005=no-status 1006=abnormal(rete) 1011=server-error
+    if (document.getElementById('radio-screen').classList.contains('active')) {
+      logSys(`⚠ WS chiuso code:${ev.code} clean:${ev.wasClean}${ev.reason?' reason:'+ev.reason:''}`);
+    }
     // Niente riconnessione se la password è sbagliata: l'utente deve correggerla
     if (authFailed) return;
     document.getElementById('reconnect-banner').classList.add('show');
