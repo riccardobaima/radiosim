@@ -16,9 +16,14 @@ const wss    = new WebSocketServer({ server });
 const PORT            = process.env.PORT || 3000;
 const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || '';
 const AUTH_ENABLED    = ACCESS_PASSWORD.length > 0;
+const ADMIN_CALLSIGN  = (process.env.ADMIN_CALLSIGN || 'ADMIN').toUpperCase();
+const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
+const ADMIN_ENABLED   = ADMIN_PASSWORD.length > 0;
 
-if (AUTH_ENABLED) console.log('[AUTH] Codice di accesso ATTIVO');
-else              console.log('[AUTH] Nessun codice — accesso libero (dev mode)');
+if (AUTH_ENABLED)  console.log('[AUTH] Codice di accesso ATTIVO');
+else               console.log('[AUTH] Nessun codice — accesso libero (dev mode)');
+if (ADMIN_ENABLED) console.log(`[ADMIN] Funzione admin ATTIVA (callsign: ${ADMIN_CALLSIGN})`);
+else               console.log('[ADMIN] Funzione admin DISATTIVATA (manca ADMIN_PASSWORD)');
 
 // ─────────────────────────────────────────────
 // Rate limit per password sbagliate (per IP)
@@ -89,7 +94,8 @@ function getUserList(room, channel) {
   if (!r) return [];
   return Array.from(r.clients.values()).map(m => ({
     id: m.id,
-    callsign: m.callsign
+    callsign: m.callsign,
+    isAdmin: !!m.isAdmin
   }));
 }
 
@@ -110,10 +116,34 @@ wss.on('connection', (ws, req) => {
 
       // ── JOIN ───────────────────────────────
       case 'join': {
-        const { callsign, room, channel, password } = msg;
+        const { callsign, room, channel, password, adminPassword } = msg;
         if (!callsign || !room || !channel) return;
 
-        if (AUTH_ENABLED) {
+        const isAdminCallsign = callsign.toUpperCase() === ADMIN_CALLSIGN;
+        let isAdmin = false;
+
+        if (isAdminCallsign) {
+          // Percorso admin: richiede ADMIN_PASSWORD (sostituisce il codice utente)
+          if (!ADMIN_ENABLED) {
+            ws.send(JSON.stringify({ type: 'error', code: 'ADMIN_DISABLED',
+              message: 'Funzione admin non configurata sul server.' }));
+            return;
+          }
+          if (!checkRate(ip)) {
+            ws.send(JSON.stringify({ type: 'error', code: 'RATE_LIMIT',
+              message: 'Troppi tentativi. Attendi un minuto e riprova.' }));
+            return;
+          }
+          if (adminPassword !== ADMIN_PASSWORD) {
+            recordFail(ip);
+            console.log(`[ADMIN] Tentativo fallito da ${ip}`);
+            ws.send(JSON.stringify({ type: 'error', code: 'WRONG_ADMIN_PASSWORD',
+              message: 'Codice admin non valido.' }));
+            return;
+          }
+          isAdmin = true;
+        } else if (AUTH_ENABLED) {
+          // Percorso utente normale
           if (!checkRate(ip)) {
             ws.send(JSON.stringify({ type: 'error', code: 'RATE_LIMIT',
               message: 'Troppi tentativi. Attendi un minuto e riprova.' }));
@@ -128,7 +158,7 @@ wss.on('connection', (ws, req) => {
           }
         }
 
-        meta = { id: uuidv4(), callsign, room, channel };
+        meta = { id: uuidv4(), callsign, room, channel, isAdmin };
         const r = getOrCreateRoom(room, channel);
 
         // Controlla nominativo duplicato
@@ -151,6 +181,7 @@ wss.on('connection', (ws, req) => {
           callsign,
           channel,
           room,
+          isAdmin,
           users: getUserList(room, channel),
           currentTx: r.currentTx
         }));
@@ -160,10 +191,11 @@ wss.on('connection', (ws, req) => {
           type: 'user_joined',
           id: meta.id,
           callsign,
+          isAdmin,
           users: getUserList(room, channel)
         }, ws);
 
-        console.log(`[JOIN] ${callsign} → stanza:${room} canale:${channel} (${r.clients.size} utenti)`);
+        console.log(`[JOIN] ${callsign}${isAdmin ? ' (ADMIN)' : ''} → stanza:${room} canale:${channel} (${r.clients.size} utenti)`);
         break;
       }
 
@@ -189,6 +221,26 @@ wss.on('connection', (ws, req) => {
           type: 'ptt_start',
           callsign: meta.callsign,
           id: meta.id
+        });
+        break;
+      }
+
+      // ── ADMIN KILL TX ──────────────────────
+      // Solo admin: forza il rilascio del PTT in corso sulla stanza/canale
+      case 'admin_kill_tx': {
+        if (!meta || !meta.isAdmin) return;
+        const { room, channel } = meta;
+        const r = rooms.get(getRoomKey(room, channel));
+        if (!r || !r.currentTx) return;
+
+        const previousTx = r.currentTx;
+        r.currentTx = null;
+        console.log(`[ADMIN KILL] ${meta.callsign} ha sbloccato il canale (era: ${previousTx})`);
+
+        broadcastAll(room, channel, {
+          type: 'ptt_stop',
+          callsign: previousTx,
+          forcedBy: meta.callsign
         });
         break;
       }

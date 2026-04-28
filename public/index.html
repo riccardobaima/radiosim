@@ -203,6 +203,27 @@ html, body {
 
 .ptt-status { font-family: var(--mono); font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-align: center; min-height: 16px; }
 
+/* ── ADMIN ──────────────────────────────── */
+.admin-kill-btn {
+  display: none;
+  width: 100%; max-width: 260px;
+  background: rgba(232,92,46,.12); border: 1px solid var(--tx);
+  color: var(--tx); font-family: var(--sans); font-weight: 700;
+  font-size: 13px; letter-spacing: 2px; padding: 11px 14px;
+  border-radius: 6px; cursor: pointer;
+  transition: background .15s, transform .08s, opacity .15s;
+}
+.admin-kill-btn.show { display: block; }
+.admin-kill-btn:hover { background: rgba(232,92,46,.25); }
+.admin-kill-btn:active { transform: scale(.97); }
+.admin-kill-btn:disabled { opacity: .35; cursor: not-allowed; }
+.admin-badge {
+  display: inline-block; margin-left: 4px;
+  font-size: 9px; padding: 1px 5px; border-radius: 3px;
+  background: var(--tx-dim); color: var(--tx);
+  letter-spacing: 1px; font-weight: 700;
+}
+
 /* ── LOG ──────────────────────────────────── */
 .section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .section-hdr {
@@ -301,6 +322,10 @@ html, body {
     <div class="field-label">CODICE ACCESSO</div>
     <input id="in-password" type="password" placeholder="codice fornito dal coordinatore" maxlength="64" autocomplete="off" spellcheck="false">
   </div>
+  <div class="field">
+    <div class="field-label">CODICE ADMIN <span style="color:var(--text-dim);text-transform:none;letter-spacing:0;font-family:var(--body)">— solo coordinatori, lascia vuoto se non sei admin</span></div>
+    <input id="in-admin-password" type="password" placeholder="opzionale" maxlength="64" autocomplete="off" spellcheck="false">
+  </div>
 
   <button class="join-btn" id="join-btn" onclick="doJoin()">ENTRA SUL CANALE ↗</button>
 
@@ -379,6 +404,8 @@ html, body {
 
       <div class="meter-bar"><div class="meter-fill" id="meter-fill"></div></div>
       <div class="ptt-status" id="ptt-status">Inizializzazione microfono...</div>
+
+      <button id="admin-kill-btn" class="admin-kill-btn" onclick="adminKillTx()" disabled>🔴 SBLOCCA CANALE</button>
     </div>
   </div>
 
@@ -424,7 +451,8 @@ const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};
 // ════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════
-let myCallsign='', myChannel='1', myRoom='', myPassword='', myId='';
+let myCallsign='', myChannel='1', myRoom='', myPassword='', myAdminPassword='', myId='';
+let isAdmin=false;
 let ws=null, reconnectTimer=null, pingInterval=null, authFailed=false;
 let audioCtx=null, analyser=null, micStream=null;
 let peers={}; // id -> RTCPeerConnection
@@ -444,6 +472,7 @@ async function doJoin() {
   myChannel  = document.getElementById('in-channel').value;
   myRoom     = document.getElementById('in-room').value.trim().toUpperCase() || 'FORMAZIONE-01';
   myPassword = document.getElementById('in-password').value;
+  myAdminPassword = document.getElementById('in-admin-password').value;
 
   authFailed = false;
   document.getElementById('join-btn').disabled = true;
@@ -492,7 +521,7 @@ function connectWS() {
 
   ws.onopen = () => {
     setConn('connecting', 'CONNESSIONE...');
-    ws.send(JSON.stringify({ type:'join', callsign:myCallsign, room:myRoom, channel:myChannel, password:myPassword }));
+    ws.send(JSON.stringify({ type:'join', callsign:myCallsign, room:myRoom, channel:myChannel, password:myPassword, adminPassword:myAdminPassword }));
     pingInterval = setInterval(() => { if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
   };
 
@@ -521,16 +550,22 @@ function handleServer(msg) {
 
     case 'joined':
       myId = msg.id;
+      isAdmin = !!msg.isAdmin;
       showRadio();
       setConn('connected', 'IN RETE');
       document.getElementById('reconnect-banner').classList.remove('show');
       // Costruiamo peers con chi è già connesso
       msg.users.forEach(u => {
-        if (u.id !== myId) { users[u.id]={callsign:u.callsign,speaking:false}; createPeer(u.id,true); }
+        if (u.id !== myId) { users[u.id]={callsign:u.callsign,speaking:false,isAdmin:!!u.isAdmin}; createPeer(u.id,true); }
       });
-      users[myId] = {callsign:myCallsign, speaking:false, isMe:true};
+      users[myId] = {callsign:myCallsign, speaking:false, isMe:true, isAdmin};
       renderUsers();
-      logSys('Connesso — stanza: ' + myRoom + ' · ' + CH_LBLS[myChannel]);
+      if (isAdmin) {
+        document.getElementById('admin-kill-btn').classList.add('show');
+        logSys('Connesso come ADMIN — stanza: ' + myRoom + ' · ' + CH_LBLS[myChannel]);
+      } else {
+        logSys('Connesso — stanza: ' + myRoom + ' · ' + CH_LBLS[myChannel]);
+      }
       if (msg.currentTx) setChannelBusy(true, msg.currentTx);
       break;
 
@@ -550,9 +585,9 @@ function handleServer(msg) {
 
     case 'user_joined':
       if (msg.id !== myId) {
-        users[msg.id] = {callsign:msg.callsign, speaking:false};
+        users[msg.id] = {callsign:msg.callsign, speaking:false, isAdmin:!!msg.isAdmin};
         renderUsers();
-        logSys(msg.callsign + ' entrato sul canale');
+        logSys(msg.callsign + (msg.isAdmin ? ' (ADMIN)' : '') + ' entrato sul canale');
         createPeer(msg.id, false);
       }
       updateUsersCount(msg.users.length);
@@ -579,7 +614,24 @@ function handleServer(msg) {
       break;
 
     case 'ptt_stop':
-      if (msg.callsign !== myCallsign) {
+      if (msg.forcedBy) {
+        // Sblocco forzato dall'admin
+        if (msg.callsign === myCallsign && isTx) {
+          // Ero io a trasmettere: forza rilascio PTT locale
+          isTx = false;
+          if (micStream) micStream.getAudioTracks().forEach(t => t.enabled = false);
+          document.getElementById('ptt-btn').classList.remove('transmitting');
+          stopMeter();
+          clearInterval(txTimerInt);
+          document.getElementById('tx-timer').textContent = '';
+          setPttStatus('⚠ TX interrotta da ' + msg.forcedBy + ' (admin)');
+        }
+        // Trova l'id dello speaker per togliere lo stato "speaking"
+        const speakerEntry = Object.entries(users).find(([,u]) => u.callsign === msg.callsign);
+        if (speakerEntry) setSpeaking(speakerEntry[0], false);
+        setChannelFree();
+        logSys('⚠ ' + msg.forcedBy + ' (ADMIN) ha sbloccato il canale — ' + msg.callsign + ' interrotto');
+      } else if (msg.callsign !== myCallsign) {
         setSpeaking(msg.id, false);
         setChannelFree();
         logTx(msg.callsign, '■ fine trasmissione');
@@ -758,6 +810,7 @@ function setChannelBusy(busy, callsign) {
     who.textContent = '▶ RX — ' + callsign + ' IN TRASMISSIONE';
     document.getElementById('ptt-btn').classList.add('locked');
   }
+  updateAdminBtnState();
 }
 
 function setChannelFree() {
@@ -769,6 +822,23 @@ function setChannelFree() {
   who.classList.remove('active'); who.textContent = 'CANALE LIBERO';
   document.getElementById('ptt-btn').classList.remove('locked');
   document.getElementById('tx-timer').textContent = '';
+  updateAdminBtnState();
+}
+
+function updateAdminBtnState() {
+  if (!isAdmin) return;
+  const btn = document.getElementById('admin-kill-btn');
+  btn.disabled = !chanBusy;
+}
+
+function adminKillTx() {
+  if (!isAdmin || !chanBusy) return;
+  if (currentSpeaker === myCallsign) {
+    pttUp(null);
+    return;
+  }
+  if (!confirm(`Sbloccare il canale e interrompere ${currentSpeaker}?`)) return;
+  wsSend({ type:'admin_kill_tx' });
 }
 
 function updateTxTimer() {
@@ -821,7 +891,7 @@ function renderUsers() {
     const chip = document.createElement('div');
     chip.className = 'user-chip' + (u.speaking?' speaking':'') + (u.isMe?' me':'');
     chip.id = 'chip-'+id;
-    chip.innerHTML = `<div class="u-av">${u.callsign.slice(0,2)}</div>${u.callsign}${u.isMe?' <small style="opacity:.5">(io)</small>':''}`;
+    chip.innerHTML = `<div class="u-av">${u.callsign.slice(0,2)}</div>${u.callsign}${u.isAdmin?' <span class="admin-badge">ADMIN</span>':''}${u.isMe?' <small style="opacity:.5">(io)</small>':''}`;
     grid.appendChild(chip);
   });
   updateUsersCount(Object.keys(users).length);

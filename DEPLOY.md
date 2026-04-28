@@ -124,6 +124,35 @@ Esempio risposta `/status`:
 
 ---
 
+## 👮 Funzione ADMIN (sblocca canale)
+
+Per gestire situazioni in cui un volontario tiene il PTT premuto per errore o per sbloccare il canale durante un'esercitazione, è disponibile un ruolo **admin**.
+
+### Come si attiva
+
+Imposta su Railway (Variables) la variabile d'ambiente:
+
+| Variabile | Valore | Note |
+|-----------|--------|------|
+| `ADMIN_PASSWORD` | password a tua scelta | obbligatoria per attivare la funzione |
+| `ADMIN_CALLSIGN` | `ADMIN` | facoltativa (default: `ADMIN`) |
+
+Senza `ADMIN_PASSWORD` la funzione admin è **disattivata** e nessuno può entrare con il nominativo admin.
+
+### Come si usa
+
+1. Il coordinatore apre l'app come tutti gli altri.
+2. Inserisce come **NOMINATIVO** quello configurato in `ADMIN_CALLSIGN` (default `ADMIN`).
+3. Compila il campo **CODICE ADMIN** con la password admin (il campo CODICE ACCESSO può essere lasciato vuoto in questo caso).
+4. Sceglie stessa stanza/canale dei volontari da supervisionare.
+5. Una volta dentro: vede il pulsante rosso **🔴 SBLOCCA CANALE** sotto il PTT.
+6. Il pulsante è attivo solo quando il canale è occupato. Cliccando, dopo conferma, interrompe la trasmissione in corso.
+7. L'admin può comunque parlare e ricevere come tutti gli altri.
+
+Tutti gli utenti del canale vedono il badge `ADMIN` accanto al nominativo del coordinatore, e nel log appare un avviso quando l'admin sblocca il canale.
+
+---
+
 ## 🔒 Note tecniche
 
 | Aspetto | Soluzione |
