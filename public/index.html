@@ -361,7 +361,8 @@ html, body {
     2. Ogni volontario inserisce il proprio nominativo e la stessa stanza.<br>
     3. Su PC usa la <strong>barra spaziatrice</strong> come tasto PTT.<br>
     4. Su mobile tieni premuto il <strong>grande tasto PTT</strong>.<br>
-    5. Come su una vera radio: solo uno parla alla volta.
+    5. Come su una vera radio: solo uno parla alla volta.<br><br>
+    <strong>📱 Su smartphone:</strong> tieni lo schermo acceso durante l'uso (lo standby chiude la connessione). L'app prova a impedirlo automaticamente, ma su iOS serve almeno Safari 16.4.
   </div>
 </div>
 
@@ -519,7 +520,45 @@ function showRadio() {
   document.getElementById('freq-num').textContent = CH_NAMES[myChannel];
   document.getElementById('badge-ch').textContent = CH_LBLS[myChannel];
   startSigAnim();
+  requestWakeLock();
 }
+
+// ════════════════════════════════════════════════
+// WAKE LOCK — impedisce allo schermo di spegnersi mentre si è connessi
+// (su mobile lo standby chiude il WebSocket → disconnessioni continue)
+// ════════════════════════════════════════════════
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) {
+    logSys('ℹ Wake Lock non supportata — tieni lo schermo acceso manualmente');
+    return;
+  }
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+    logSys('🔆 Schermo bloccato attivo (no standby)');
+  } catch (e) {
+    console.warn('[WakeLock]', e.message);
+  }
+}
+
+async function releaseWakeLock() {
+  if (wakeLock) {
+    try { await wakeLock.release(); } catch{}
+    wakeLock = null;
+  }
+}
+
+// Quando l'utente torna sulla scheda, ri-richiedi la wake lock (il browser
+// la rilascia automaticamente quando la pagina va in background)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible'
+      && document.getElementById('radio-screen').classList.contains('active')
+      && !wakeLock) {
+    requestWakeLock();
+  }
+});
 
 function doLogout() {
   if (!confirm('Disconnettersi dal canale?')) return;
@@ -544,6 +583,8 @@ function doLogout() {
   if (rxAudioCtx){ try { rxAudioCtx.close(); } catch{} rxAudioCtx = null; }
   // Rimuovi gli <audio> peer rimasti
   document.querySelectorAll('audio[id^="aud-"]').forEach(a => a.remove());
+  // Rilascia wake lock
+  releaseWakeLock();
 
   // Chiudi WebSocket — rimuovi gli handler PRIMA di close() per evitare
   // che l'onclose asincrono inneschi la riconnessione automatica
@@ -613,7 +654,7 @@ function connectWS() {
   ws.onopen = () => {
     setConn('connecting', 'CONNESSIONE...');
     ws.send(JSON.stringify({ type:'join', callsign:myCallsign, room:myRoom, channel:myChannel, password:myPassword, adminPassword:myAdminPassword }));
-    pingInterval = setInterval(() => { if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
+    pingInterval = setInterval(() => { if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 15000);
   };
 
   ws.onmessage = (ev) => {
