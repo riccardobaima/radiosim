@@ -82,7 +82,8 @@ function validateJoin(callsign, room, channel) {
 // rooms[roomKey] = {
 //   channel: '1',
 //   clients: Map<ws, { id, callsign, room, channel }>,
-//   currentTx: null   // callsign di chi sta trasmettendo
+//   currentTx: null,   // callsign di chi sta trasmettendo
+//   currentTxId: null  // id (uuid) di chi sta trasmettendo, per inviarlo al client
 // }
 // ─────────────────────────────────────────────
 const rooms = new Map();
@@ -94,7 +95,7 @@ function getRoomKey(room, channel) {
 function getOrCreateRoom(room, channel) {
   const key = getRoomKey(room, channel);
   if (!rooms.has(key)) {
-    rooms.set(key, { channel, clients: new Map(), currentTx: null });
+    rooms.set(key, { channel, clients: new Map(), currentTx: null, currentTxId: null });
   }
   return rooms.get(key);
 }
@@ -249,6 +250,7 @@ wss.on('connection', (ws, req) => {
         }
 
         r.currentTx = meta.callsign;
+        r.currentTxId = meta.id;
         console.log(`[TX START] ${meta.callsign}`);
 
         // Notifica a tutti (incluso il mittente per conferma)
@@ -269,12 +271,15 @@ wss.on('connection', (ws, req) => {
         if (!r || !r.currentTx) return;
 
         const previousTx = r.currentTx;
+        const previousTxId = r.currentTxId;
         r.currentTx = null;
+        r.currentTxId = null;
         console.log(`[ADMIN KILL] ${meta.callsign} ha sbloccato il canale (era: ${previousTx})`);
 
         broadcastAll(room, channel, {
           type: 'ptt_stop',
           callsign: previousTx,
+          id: previousTxId,
           forcedBy: meta.callsign
         });
         break;
@@ -289,11 +294,13 @@ wss.on('connection', (ws, req) => {
         if (r.currentTx !== meta.callsign) return;
 
         r.currentTx = null;
+        r.currentTxId = null;
         console.log(`[TX STOP] ${meta.callsign}`);
 
         broadcastAll(room, channel, {
           type: 'ptt_stop',
-          callsign: meta.callsign
+          callsign: meta.callsign,
+          id: meta.id
         });
         break;
       }
@@ -340,7 +347,7 @@ wss.on('connection', (ws, req) => {
     if (!r) return;
 
     r.clients.delete(ws);
-    if (r.currentTx === callsign) r.currentTx = null;
+    if (r.currentTx === callsign) { r.currentTx = null; r.currentTxId = null; }
 
     console.log(`[LEAVE] ${callsign} (${r.clients.size} rimasti)`);
 

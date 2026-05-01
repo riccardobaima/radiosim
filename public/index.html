@@ -764,9 +764,7 @@ function handleServer(msg) {
           document.getElementById('tx-timer').textContent = '';
           setPttStatus('⚠ TX interrotta da ' + msg.forcedBy + ' (admin)');
         }
-        // Trova l'id dello speaker per togliere lo stato "speaking"
-        const speakerEntry = Object.entries(users).find(([,u]) => u.callsign === msg.callsign);
-        if (speakerEntry) setSpeaking(speakerEntry[0], false);
+        if (msg.id) setSpeaking(msg.id, false);
         setChannelFree();
         logSys('⚠ ' + msg.forcedBy + ' (ADMIN) ha sbloccato il canale — ' + msg.callsign + ' interrotto');
         playRogerBeep();
