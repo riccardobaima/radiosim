@@ -881,6 +881,9 @@ function handleServer(msg) {
         setChannelFree();
         logTx(msg.callsign, '■ fine trasmissione');
         playRogerBeep();
+      } else {
+        // Conferma server della propria fine TX — log per coerenza
+        logTx(myCallsign, '■ fine trasmissione');
       }
       break;
 
