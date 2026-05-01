@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>RadioSim — Manuale per i volontari</title>
+<style>
+:root {
+  --ink:    #1a1a1a;
+  --muted:  #555;
+  --accent: #1a7a3e;
+  --warn:   #b34a1a;
+  --bg:     #ffffff;
+  --rule:   #d0d0d0;
+  --soft:   #f3f6f3;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg); color: var(--ink);
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 11.5pt; line-height: 1.45;
+}
+body { padding: 20mm 18mm; max-width: 210mm; margin: 0 auto; }
+
+/* ── HEADER ─────────────────────── */
+header {
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 10px; border-bottom: 2px solid var(--accent);
+  margin-bottom: 16px;
+}
+header img { height: 48px; }
+header .titles { flex: 1; }
+header h1 { font-size: 22pt; font-weight: 800; letter-spacing: 0.5px; color: var(--accent); }
+header .sub { font-size: 10.5pt; color: var(--muted); margin-top: 2px; }
+
+/* ── SECTIONS ───────────────────── */
+section { margin-top: 16px; page-break-inside: avoid; }
+h2 {
+  font-size: 14pt; font-weight: 700; color: var(--accent);
+  margin-bottom: 6px; padding-bottom: 3px;
+  border-bottom: 1px solid var(--rule);
+}
+h3 { font-size: 12pt; font-weight: 700; margin: 10px 0 4px; }
+p, li { margin-bottom: 5px; }
+ol, ul { padding-left: 22px; }
+ol li, ul li { margin-bottom: 4px; }
+strong { color: var(--ink); }
+
+/* ── BOXES ──────────────────────── */
+.box {
+  background: var(--soft);
+  border-left: 4px solid var(--accent);
+  padding: 9px 12px; margin: 9px 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 10.5pt;
+}
+.box.warn { border-left-color: var(--warn); }
+.box .lbl { font-weight: 700; color: var(--accent); }
+.box.warn .lbl { color: var(--warn); }
+
+/* ── KBD / CHIP ─────────────────── */
+kbd {
+  display: inline-block;
+  font-family: "Consolas", "Menlo", monospace;
+  background: #eaeaea; border: 1px solid #bbb; border-bottom-width: 2px;
+  border-radius: 4px; padding: 1px 7px; font-size: 10pt;
+  color: var(--ink);
+}
+.chip {
+  display: inline-block; padding: 1px 7px;
+  background: #e6efe6; border: 1px solid var(--accent);
+  border-radius: 999px; font-size: 9.5pt; color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── TABLE ──────────────────────── */
+table {
+  width: 100%; border-collapse: collapse;
+  margin: 8px 0; font-size: 10.5pt;
+}
+th, td {
+  border: 1px solid var(--rule);
+  padding: 6px 9px; text-align: left;
+  vertical-align: top;
+}
+th { background: var(--soft); font-weight: 700; }
+
+/* ── FOOTER ─────────────────────── */
+footer {
+  margin-top: 22px; padding-top: 10px;
+  border-top: 1px solid var(--rule);
+  font-size: 9pt; color: var(--muted);
+  display: flex; justify-content: space-between;
+}
+
+/* ── PRINT ──────────────────────── */
+@media print {
+  body { padding: 0; }
+  @page { margin: 16mm 14mm; size: A4; }
+  header { border-bottom-color: #000; }
+  .box, table th { background: #f5f5f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <img src="fir-logo.png" alt="FIR CB Servizio Emergenza Radio">
+  <div class="titles">
+    <h1>RADIOSIM</h1>
+    <div class="sub">Manuale rapido per i volontari · Simulatore radio per la formazione FIR CB</div>
+  </div>
+</header>
+
+<section>
+  <h2>1. Cos'è RadioSim</h2>
+  <p>RadioSim è un simulatore di radiocomunicazione che funziona dal browser di qualsiasi PC, smartphone o tablet. Riproduce il comportamento di una radio VHF/UHF half-duplex con PTT (Push-To-Talk) e i quattro talkgroup DMR usati dalla FIR CB. Serve per esercitarsi, non sostituisce le radio reali in operatività.</p>
+</section>
+
+<section>
+  <h2>2. Cosa serve per partecipare</h2>
+  <ul>
+    <li>Un dispositivo con browser recente: <strong>Chrome / Edge / Firefox</strong> su PC, <strong>Chrome</strong> su Android, <strong>Safari</strong> su iPhone (versione 16.4 o successiva).</li>
+    <li>Un <strong>microfono</strong> e <strong>cuffie</strong> (consigliate: niente larsen, audio più pulito).</li>
+    <li>Una connessione internet stabile (Wi-Fi o 4G).</li>
+    <li>Il <strong>link</strong> alla tua istanza RadioSim e il <strong>codice di accesso</strong> comunicati dal coordinatore.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>3. Come si entra sul canale</h2>
+  <ol>
+    <li>Apri il link nel browser. Su mobile puoi anche aggiungerlo alla schermata Home come app.</li>
+    <li>Compila i campi della schermata di accesso:
+      <ul>
+        <li><strong>NOMINATIVO / CALLSIGN</strong>: il tuo callsign (es. <span class="chip">ALFA-1</span>). Da 2 a 12 caratteri tra A-Z, 0-9, trattino e underscore.</li>
+        <li><strong>CANALE</strong>: il canale comunicato dal coordinatore (CH 01–CH 04, corrispondenti ai talkgroup DMR FIR).</li>
+        <li><strong>STANZA / SESSIONE</strong>: il codice della sessione di esercitazione (es. <span class="chip">FORMAZIONE-01</span>). Tutti i partecipanti devono usare la stessa stanza per sentirsi.</li>
+        <li><strong>CODICE ACCESSO</strong>: la password comunicata dal coordinatore.</li>
+        <li><strong>CODICE ADMIN</strong>: lascialo vuoto (è solo per i coordinatori).</li>
+      </ul>
+    </li>
+    <li>Premi <strong>ENTRA SUL CANALE</strong>.</li>
+    <li>Se è la prima volta, il browser ti chiede il <strong>permesso del microfono</strong>: premi <strong>Consenti</strong>. Senza microfono non puoi trasmettere.</li>
+  </ol>
+  <div class="box">
+    <span class="lbl">SUGGERIMENTO —</span> il browser ricorda il permesso microfono per quel sito: dalla seconda volta in poi non te lo chiederà più.
+  </div>
+</section>
+
+<section>
+  <h2>4. Come si trasmette (PTT)</h2>
+  <p>Come su una radio reale, <strong>una sola persona alla volta</strong> può parlare per ciascun canale. Il sistema impedisce due trasmissioni in contemporanea.</p>
+  <table>
+    <tr><th>Dispositivo</th><th>Tasto PTT</th></tr>
+    <tr>
+      <td>PC / Mac</td>
+      <td>Tieni premuta la <kbd>Barra spaziatrice</kbd> mentre parli. Rilascia quando finisci.</td>
+    </tr>
+    <tr>
+      <td>Smartphone / Tablet</td>
+      <td>Tieni premuto il grande pulsante rotondo <strong>PTT</strong> mentre parli. Rilascia quando finisci.</td>
+    </tr>
+  </table>
+  <p>Quando il canale è libero il display dice <strong>CANALE LIBERO</strong>; quando qualcuno trasmette appare <strong>RX — &lt;NOMINATIVO&gt; IN TRASMISSIONE</strong> e il pulsante PTT si blocca finché l'altro non rilascia.</p>
+  <p>Al termine di ogni trasmissione si sente un breve <strong>beep</strong> (roger beep) — è il segnale di fine modulazione.</p>
+  <div class="box warn">
+    <span class="lbl">ATTENZIONE —</span> non tenere premuto il PTT a vuoto: bloccheresti il canale per tutti gli altri. Se ti capita per errore, basta rilasciare e il canale torna libero.
+  </div>
+</section>
+
+<section>
+  <h2>5. Stanze e canali</h2>
+  <p>Per gestire più gruppi in parallelo l'app combina due livelli:</p>
+  <ul>
+    <li>La <strong>STANZA</strong> separa esercitazioni diverse (es. <em>FORMAZIONE-01</em> e <em>FORMAZIONE-02</em> sono completamente isolate).</li>
+    <li>Il <strong>CANALE</strong> (1-4) all'interno della stessa stanza simula i talkgroup DMR. Persone su canali diversi nella stessa stanza non si sentono.</li>
+  </ul>
+  <p>Per cambiare canale devi uscire e rientrare scegliendo il canale nuovo.</p>
+</section>
+
+<section>
+  <h2>6. Procedura radio (regole basilari)</h2>
+  <ol>
+    <li><strong>Ascolta prima di trasmettere</strong>: verifica che il canale sia libero.</li>
+    <li><strong>Identificati</strong>: dichiara nominativo chiamante e nominativo chiamato (es. <em>«ALFA-1 da BRAVO-2, mi ricevi?»</em>).</li>
+    <li><strong>Sii sintetico</strong>: messaggi brevi, niente frasi di troppo.</li>
+    <li><strong>Cambio</strong>: chiudi ogni intervento con <em>«cambio»</em> per dare la parola.</li>
+    <li><strong>Chiudi</strong> con <em>«passo e chiudo»</em> quando la comunicazione è terminata.</li>
+    <li><strong>Litera fonetica</strong>: usa l'alfabeto NATO per ortografare nomi/dati (Alfa, Bravo, Charlie...).</li>
+  </ol>
+</section>
+
+<section>
+  <h2>7. Tieni lo schermo acceso (solo mobile)</h2>
+  <p>Su smartphone, lo standby dello schermo chiude la connessione e ti fa uscire dal canale. L'app cerca di tenere lo schermo acceso automaticamente, ma <strong>non bloccare il telefono manualmente</strong> durante l'esercitazione.</p>
+</section>
+
+<section>
+  <h2>8. Problemi comuni</h2>
+  <table>
+    <tr><th>Problema</th><th>Soluzione</th></tr>
+    <tr>
+      <td>Non sento il microfono</td>
+      <td>Controlla che il browser abbia il permesso (icona lucchetto a sinistra dell'URL → Microfono → Consenti). Su iPhone disattiva la modalità silenzioso.</td>
+    </tr>
+    <tr>
+      <td>Non sento gli altri</td>
+      <td>Verifica lo slider <strong>VOLUME RICEZIONE</strong> sulla radio, il volume del dispositivo e che le cuffie siano collegate. Se sei su iPhone, tocca un punto qualsiasi della pagina dopo essere entrato per sbloccare l'audio.</td>
+    </tr>
+    <tr>
+      <td>«Codice di accesso non valido»</td>
+      <td>Le password sono case-sensitive. Dopo 5 tentativi errati il sistema blocca per 60 secondi (anti brute-force).</td>
+    </tr>
+    <tr>
+      <td>«Nominativo già in uso»</td>
+      <td>Un altro volontario sta usando lo stesso callsign sulla stessa stanza+canale. Cambia nominativo.</td>
+    </tr>
+    <tr>
+      <td>«Canale pieno»</td>
+      <td>Il canale ha raggiunto il limite di partecipanti impostato dal coordinatore. Prova un altro canale.</td>
+    </tr>
+    <tr>
+      <td>Disconnessioni continue</td>
+      <td>Tipicamente schermo che si spegne o app in background. Tieni l'app in primo piano e lo schermo acceso. Se il problema persiste, ricarica la pagina (Ctrl+F5 su PC).</td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <h2>9. Buona pratica per le esercitazioni</h2>
+  <ul>
+    <li>Effettua un <strong>test radio</strong> di 10 secondi all'inizio: «<em>controllo canale, ALFA-1 in prova</em>».</li>
+    <li>Se sei in gruppo numeroso, spalma le persone sui 4 canali per ridurre la concorrenza sul PTT.</li>
+    <li>Mantieni la <strong>disciplina del silenzio</strong>: parla solo quando hai qualcosa da dire.</li>
+    <li>Le sessioni si <strong>registrano facilmente</strong> con uno screen recorder + audio del sistema, utile per debriefing.</li>
+  </ul>
+</section>
+
+<footer>
+  <span>RadioSim — FIR CB Servizio Emergenza Radio</span>
+  <span>Versione manuale 1.0</span>
+</footer>
+
+</body>
+</html>
