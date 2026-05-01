@@ -78,6 +78,7 @@ Vai su Railway → progetto `radiosim` → tab **"Variables"** e aggiungi:
 | `ACCESS_PASSWORD` | sì (in produzione) | Codice di accesso per i volontari. Senza questa variabile l'accesso è libero (modalità dev). |
 | `ADMIN_PASSWORD` | facoltativa | Abilita il ruolo admin (vedi sezione dedicata sotto). Se non impostata, nessuno può entrare come admin. |
 | `ADMIN_CALLSIGN` | facoltativa | Nominativo che identifica l'admin. Default: `ADMIN`. |
+| `MAX_USERS_PER_CHANNEL` | facoltativa | Tetto al numero di utenti per coppia stanza+canale. Default `0` o assente = illimitato. Suggerito `8` per mantenere fluida la mesh WebRTC. Gli admin entrano sempre, anche se il canale è pieno. |
 
 > ⚠️ **Attenzione**: dopo aver salvato una variabile, Railway riavvia automaticamente il servizio (~30 s). Controlla che non ci siano spazi accidentali a inizio/fine quando incolli il valore.
 
