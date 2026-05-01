@@ -23,11 +23,15 @@ const AUTH_ENABLED    = ACCESS_PASSWORD.length > 0;
 const ADMIN_CALLSIGN  = (process.env.ADMIN_CALLSIGN || 'ADMIN').toUpperCase();
 const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ADMIN_ENABLED   = ADMIN_PASSWORD.length > 0;
+// Limite utenti per canale (per stanza). 0 o assente = illimitato.
+const MAX_USERS_PER_CHANNEL = Math.max(0, parseInt(process.env.MAX_USERS_PER_CHANNEL || '0', 10));
 
 if (AUTH_ENABLED)  console.log('[AUTH] Codice di accesso ATTIVO');
 else               console.log('[AUTH] Nessun codice — accesso libero (dev mode)');
 if (ADMIN_ENABLED) console.log(`[ADMIN] Funzione admin ATTIVA (callsign: ${ADMIN_CALLSIGN})`);
 else               console.log('[ADMIN] Funzione admin DISATTIVATA (manca ADMIN_PASSWORD)');
+if (MAX_USERS_PER_CHANNEL > 0) console.log(`[LIMIT] Max ${MAX_USERS_PER_CHANNEL} utenti per canale`);
+else                           console.log('[LIMIT] Nessun limite utenti per canale');
 
 // ─────────────────────────────────────────────
 // Rate limit per password sbagliate (per IP)
@@ -217,6 +221,14 @@ wss.on('connection', (ws, req) => {
 
         meta = { id: uuidv4(), callsign, room, channel, isAdmin };
         const r = getOrCreateRoom(room, channel);
+
+        // Controllo capienza canale (gli admin entrano sempre, anche se pieno)
+        if (!isAdmin && MAX_USERS_PER_CHANNEL > 0 && r.clients.size >= MAX_USERS_PER_CHANNEL) {
+          console.log(`[LIMIT] Canale ${room}__CH${channel} pieno (${r.clients.size}/${MAX_USERS_PER_CHANNEL}) — rifiutato ${callsign}`);
+          ws.send(JSON.stringify({ type: 'error', code: 'CHANNEL_FULL',
+            message: `Canale pieno: massimo ${MAX_USERS_PER_CHANNEL} utenti per canale. Prova un altro canale.` }));
+          return;
+        }
 
         // Controlla nominativo duplicato
         let nameConflict = false;
