@@ -55,6 +55,29 @@ setInterval(() => {
 }, RL_WINDOW_MS);
 
 // ─────────────────────────────────────────────
+// Validazione input — allineata ai limiti del client
+// (callsign maxlength 12, room maxlength 24, charset A-Z0-9-_)
+// Il client viene reso in innerHTML, quindi qui ci difendiamo da
+// payload manomessi che possano contenere HTML/script.
+// ─────────────────────────────────────────────
+const CALLSIGN_RE = /^[A-Z0-9_-]{2,12}$/;
+const ROOM_RE     = /^[A-Z0-9_-]{1,24}$/;
+const VALID_CHANNELS = new Set(['1', '2', '3', '4']);
+
+function validateJoin(callsign, room, channel) {
+  if (typeof callsign !== 'string' || !CALLSIGN_RE.test(callsign)) {
+    return 'Nominativo non valido (2-12 caratteri: A-Z, 0-9, - _).';
+  }
+  if (typeof room !== 'string' || !ROOM_RE.test(room)) {
+    return 'Stanza non valida (max 24 caratteri: A-Z, 0-9, - _).';
+  }
+  if (!VALID_CHANNELS.has(String(channel))) {
+    return 'Canale non valido.';
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────
 // Stato globale
 // rooms[roomKey] = {
 //   channel: '1',
@@ -122,6 +145,14 @@ wss.on('connection', (ws, req) => {
       case 'join': {
         const { callsign, room, channel, password, adminPassword } = msg;
         if (!callsign || !room || !channel) return;
+
+        const validationError = validateJoin(callsign, room, channel);
+        if (validationError) {
+          console.log(`[VALIDATE] Join rifiutato da ${ip}: ${validationError}`);
+          ws.send(JSON.stringify({ type: 'error', code: 'INVALID_INPUT',
+            message: validationError }));
+          return;
+        }
 
         const isAdminCallsign = callsign.toUpperCase() === ADMIN_CALLSIGN;
         let isAdmin = false;
