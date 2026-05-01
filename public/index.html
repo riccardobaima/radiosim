@@ -491,6 +491,16 @@ const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};
 let myCallsign='', myChannel='1', myRoom='', myPassword='', myAdminPassword='', myId='';
 let isAdmin=false;
 let ws=null, reconnectTimer=null, pingInterval=null, authFailed=false;
+let reconnectAttempts = 0;
+// Backoff esponenziale per la riconnessione automatica:
+// 2s, 4s, 8s, 16s, poi tetto a 30s. Jitter ±20% per evitare che tutti i
+// client picchino sul server simultaneamente dopo un riavvio.
+const RECONNECT_BASE_MS = 2000;
+const RECONNECT_CAP_MS  = 30000;
+function nextReconnectDelay() {
+  const exp = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts), RECONNECT_CAP_MS);
+  return Math.round(exp * (0.8 + Math.random() * 0.4));
+}
 let audioCtx=null, analyser=null, micStream=null;
 let peers={}; // id -> RTCPeerConnection
 let users={}; // id -> {callsign, speaking}
@@ -603,6 +613,7 @@ function doLogout() {
   // Reset stato
   users = {}; myId = ''; isAdmin = false;
   chanBusy = false; currentSpeaker = null; logCount = 0;
+  reconnectAttempts = 0;
 
   // Reset UI
   document.getElementById('radio-screen').classList.remove('active');
@@ -674,10 +685,13 @@ function connectWS() {
     // Niente riconnessione se la password è sbagliata: l'utente deve correggerla
     if (authFailed) return;
     document.getElementById('reconnect-banner').classList.add('show');
+    const delay = nextReconnectDelay();
+    reconnectAttempts++;
+    console.log(`[WS] Riconnessione tra ${delay}ms (tentativo ${reconnectAttempts})`);
     reconnectTimer = setTimeout(() => {
       document.getElementById('reconnect-banner').classList.remove('show');
       connectWS();
-    }, 4000);
+    }, delay);
   };
 
   ws.onerror = () => ws.close();
@@ -689,6 +703,7 @@ function handleServer(msg) {
     case 'joined':
       myId = msg.id;
       isAdmin = !!msg.isAdmin;
+      reconnectAttempts = 0;
       showRadio();
       setConn('connected', 'IN RETE');
       document.getElementById('reconnect-banner').classList.remove('show');
