@@ -25,6 +25,11 @@ const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ADMIN_ENABLED   = ADMIN_PASSWORD.length > 0;
 // Limite utenti per canale (per stanza). 0 o assente = illimitato.
 const MAX_USERS_PER_CHANNEL = Math.max(0, parseInt(process.env.MAX_USERS_PER_CHANNEL || '0', 10));
+// Finestra di grazia per la riconnessione: dopo close, l'utente resta
+// "in pending" per N ms. Se entro quel tempo rifa join con stesso
+// callsign+stanza+canale dallo stesso IP, sopprimiamo il broadcast di
+// user_left e user_joined e manteniamo lo stesso id server-side.
+const PENDING_RECONNECT_MS = 10000;
 
 if (AUTH_ENABLED)  console.log('[AUTH] Codice di accesso ATTIVO');
 else               console.log('[AUTH] Nessun codice — accesso libero (dev mode)');
@@ -219,8 +224,44 @@ wss.on('connection', (ws, req) => {
           }
         }
 
-        meta = { id: uuidv4(), callsign, room, channel, isAdmin };
         const r = getOrCreateRoom(room, channel);
+
+        // Cerca un eventuale client in attesa di rejoin con stesso callsign
+        let pendingEntry = null;
+        r.clients.forEach((m, prevWs) => {
+          if (m.callsign === callsign && m.pendingClose) {
+            pendingEntry = { meta: m, ws: prevWs };
+          }
+        });
+
+        if (pendingEntry) {
+          // Stesso IP → riconnessione legittima. IP diverso → collisione, rifiuta.
+          if (pendingEntry.meta.ip !== ip) {
+            console.log(`[REJOIN] Rifiutato: ${callsign} è in pending da IP ${pendingEntry.meta.ip}, richiesta da ${ip}`);
+            ws.send(JSON.stringify({ type: 'error', code: 'CALLSIGN_TAKEN',
+              message: `Il nominativo ${callsign} è già in uso su questo canale.` }));
+            return;
+          }
+          // Cancella timer di leave e sostituisci ws mantenendo lo stesso id
+          if (pendingEntry.meta.closeTimer) clearTimeout(pendingEntry.meta.closeTimer);
+          pendingEntry.meta.pendingClose = false;
+          pendingEntry.meta.closeTimer = null;
+          r.clients.delete(pendingEntry.ws);
+          meta = pendingEntry.meta;
+          r.clients.set(ws, meta);
+
+          ws.send(JSON.stringify({
+            type: 'joined',
+            id: meta.id,
+            callsign, channel, room,
+            isAdmin: meta.isAdmin,
+            users: getUserList(room, channel),
+            currentTx: r.currentTx
+          }));
+          // Niente broadcast user_joined: per gli altri client è una transizione invisibile
+          console.log(`[REJOIN] ${callsign} riconnesso silenziosamente (id mantenuto: ${meta.id})`);
+          break;
+        }
 
         // Controllo capienza canale (gli admin entrano sempre, anche se pieno)
         if (!isAdmin && MAX_USERS_PER_CHANNEL > 0 && r.clients.size >= MAX_USERS_PER_CHANNEL) {
@@ -230,7 +271,7 @@ wss.on('connection', (ws, req) => {
           return;
         }
 
-        // Controlla nominativo duplicato
+        // Controlla nominativo duplicato (su client già attivi, non in pending)
         let nameConflict = false;
         r.clients.forEach(m => {
           if (m.callsign === callsign) nameConflict = true;
@@ -240,6 +281,8 @@ wss.on('connection', (ws, req) => {
             message: `Il nominativo ${callsign} è già in uso su questo canale.` }));
           return;
         }
+
+        meta = { id: uuidv4(), callsign, room, channel, isAdmin, ip, pendingClose: false, closeTimer: null };
 
         r.clients.set(ws, meta);
 
@@ -357,6 +400,31 @@ wss.on('connection', (ws, req) => {
         break;
       }
 
+      // ── LEAVE (logout esplicito) ───────────
+      // Niente grazia di riconnessione: cleanup immediato + broadcast user_left.
+      case 'leave': {
+        if (!meta) return;
+        const { room, channel, callsign } = meta;
+        const r = rooms.get(getRoomKey(room, channel));
+        if (!r) return;
+        if (meta.closeTimer) { clearTimeout(meta.closeTimer); meta.closeTimer = null; }
+        meta.pendingClose = false;
+        r.clients.delete(ws);
+        if (r.currentTx === callsign) { r.currentTx = null; r.currentTxId = null; }
+        console.log(`[LEAVE explicit] ${callsign} (${r.clients.size} rimasti)`);
+        broadcast(room, channel, {
+          type: 'user_left', callsign, id: meta.id,
+          users: getUserList(room, channel)
+        });
+        if (r.clients.size === 0) {
+          rooms.delete(getRoomKey(room, channel));
+          console.log(`[ROOM] Stanza ${getRoomKey(room, channel)} rimossa (vuota)`);
+        }
+        meta = null;
+        try { ws.close(); } catch {}
+        break;
+      }
+
       // ── CHAT (opzionale) ───────────────────
       case 'chat': {
         if (!meta) return;
@@ -372,6 +440,11 @@ wss.on('connection', (ws, req) => {
   });
 
   // ── DISCONNESSIONE ─────────────────────────
+  // Apre una finestra di grazia: per PENDING_RECONNECT_MS l'utente resta
+  // in r.clients con flag pendingClose, in modo che gli altri continuino
+  // a vederlo nella lista. Se entro la finestra arriva un nuovo join con
+  // stesso callsign+room+channel dallo stesso IP, il rejoin è silenzioso.
+  // Altrimenti scade il timer e si emette user_left "vero".
   ws.on('close', () => {
     if (!meta) return;
     const { room, channel, callsign } = meta;
@@ -379,23 +452,28 @@ wss.on('connection', (ws, req) => {
     const r = rooms.get(key);
     if (!r) return;
 
-    r.clients.delete(ws);
+    // Se la TX era questo utente, libera comunque subito il canale
     if (r.currentTx === callsign) { r.currentTx = null; r.currentTxId = null; }
 
-    console.log(`[LEAVE] ${callsign} (${r.clients.size} rimasti)`);
+    meta.pendingClose = true;
+    console.log(`[LEAVE pending] ${callsign} — grazia ${PENDING_RECONNECT_MS}ms`);
 
-    broadcast(room, channel, {
-      type: 'user_left',
-      callsign,
-      id: meta.id,
-      users: getUserList(room, channel)
-    });
-
-    // Pulisci stanza vuota
-    if (r.clients.size === 0) {
-      rooms.delete(key);
-      console.log(`[ROOM] Stanza ${key} rimossa (vuota)`);
-    }
+    meta.closeTimer = setTimeout(() => {
+      // Se nel frattempo c'è stato rejoin, pendingClose è già false: skip.
+      if (!meta.pendingClose) return;
+      r.clients.delete(ws);
+      console.log(`[LEAVE final] ${callsign} (${r.clients.size} rimasti)`);
+      broadcast(room, channel, {
+        type: 'user_left',
+        callsign,
+        id: meta.id,
+        users: getUserList(room, channel)
+      });
+      if (r.clients.size === 0) {
+        rooms.delete(key);
+        console.log(`[ROOM] Stanza ${key} rimossa (vuota)`);
+      }
+    }, PENDING_RECONNECT_MS);
   });
 
   ws.on('error', (err) => console.error('[WS ERROR]', err.message));

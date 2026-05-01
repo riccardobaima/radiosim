@@ -599,9 +599,10 @@ function doLogout() {
   // Rilascia wake lock
   releaseWakeLock();
 
-  // Chiudi WebSocket — rimuovi gli handler PRIMA di close() per evitare
-  // che l'onclose asincrono inneschi la riconnessione automatica
+  // Chiudi WebSocket — invia 'leave' per cleanup immediato server-side
+  // (no grazia di riconnessione), poi rimuovi handler e chiudi.
   if (ws) {
+    try { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'leave'})); } catch{}
     ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null;
     try { ws.close(); } catch{}
     ws = null;
@@ -855,7 +856,16 @@ function createPeer(targetId, isInitiator) {
 }
 
 async function handleOffer(msg) {
-  const pc = peers[msg.fromId] || (() => { createPeer(msg.fromId, false); return peers[msg.fromId]; })();
+  // Se abbiamo già un peer per questo id ma è in stato terminale (rejoin
+  // silenzioso del mittente), lo chiudiamo e ne creiamo uno fresco.
+  let pc = peers[msg.fromId];
+  if (pc) {
+    const dead = pc.signalingState === 'closed' ||
+                 pc.connectionState === 'closed' ||
+                 pc.connectionState === 'failed';
+    if (dead) { closePeer(msg.fromId); pc = null; }
+  }
+  if (!pc) { createPeer(msg.fromId, false); pc = peers[msg.fromId]; }
   await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
