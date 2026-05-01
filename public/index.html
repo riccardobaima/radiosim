@@ -299,6 +299,50 @@ html, body {
 }
 .reconnect-banner.show { display: block; }
 
+/* ── MIC PERMISSION MODAL ───────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.78); backdrop-filter: blur(3px);
+  z-index: 2000; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  width: 100%; max-width: 360px;
+  background: var(--surface); border: 1px solid var(--accent-dim);
+  border-radius: 10px; padding: 24px 22px;
+  display: flex; flex-direction: column; gap: 16px;
+  box-shadow: 0 10px 40px rgba(61,220,132,.15);
+}
+.modal-icon {
+  width: 56px; height: 56px; margin: 0 auto 4px;
+  border-radius: 50%; background: var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-icon svg { width: 30px; height: 30px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.modal-title {
+  font-family: var(--sans); font-weight: 700; font-size: 18px;
+  letter-spacing: 1px; color: var(--accent); text-align: center;
+}
+.modal-text {
+  font-size: 14px; line-height: 1.55; color: var(--text); text-align: center;
+}
+.modal-text strong { color: #fff; }
+.modal-buttons { display: flex; gap: 10px; margin-top: 4px; }
+.modal-btn {
+  flex: 1; padding: 12px; border-radius: 6px;
+  font-family: var(--sans); font-weight: 700; font-size: 13px;
+  letter-spacing: 2px; cursor: pointer; border: 1px solid var(--border);
+  background: transparent; color: var(--text-dim);
+  transition: all .15s;
+}
+.modal-btn.primary {
+  background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
+}
+.modal-btn.primary:hover { background: var(--accent); color: #000; }
+.modal-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.modal-btn:active { transform: scale(.97); }
+
 @media(max-width:400px){
   .freq-num{font-size:22px}
   .ptt-btn{width:148px;height:148px}
@@ -462,6 +506,24 @@ html, body {
   ⚠ Connessione persa — riconnessione in corso...
 </div>
 
+<!-- MIC PERMISSION MODAL -->
+<div class="modal-overlay" id="mic-modal">
+  <div class="modal-box">
+    <div class="modal-icon">
+      <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+    </div>
+    <div class="modal-title">PERMESSO MICROFONO</div>
+    <div class="modal-text">
+      Per partecipare al canale serve l'accesso al microfono.<br>
+      Quando il browser chiede il permesso, premi <strong>Consenti</strong>.
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-btn" id="mic-cancel">ANNULLA</button>
+      <button class="modal-btn primary" id="mic-ok">HO CAPITO</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════════
 // CONFIG — in produzione la URL è auto-rilevata
@@ -519,6 +581,22 @@ async function doJoin() {
   myPassword = document.getElementById('in-password').value;
   myAdminPassword = document.getElementById('in-admin-password').value;
 
+  // Se il permesso microfono non è già concesso, mostra prima il dialog
+  // informativo, poi procedi sull'OK (mantenendo lo user gesture per
+  // far funzionare getUserMedia su iOS Safari).
+  let needsPrompt = true;
+  try {
+    if (navigator.permissions && navigator.permissions.query) {
+      const status = await navigator.permissions.query({ name: 'microphone' });
+      if (status.state === 'granted') needsPrompt = false;
+    }
+  } catch {}
+
+  if (needsPrompt) {
+    const ok = await askMicPermission();
+    if (!ok) return; // utente ha annullato
+  }
+
   authFailed = false;
   document.getElementById('join-btn').disabled = true;
   document.getElementById('join-btn').textContent = 'CONNESSIONE IN CORSO...';
@@ -528,6 +606,25 @@ async function doJoin() {
   // così quando arriverà la traccia remota potrà partire senza autoplay block.
   try { getRxCtx(); } catch{}
   connectWS();
+}
+
+function askMicPermission() {
+  return new Promise(resolve => {
+    const modal = document.getElementById('mic-modal');
+    const btnOk = document.getElementById('mic-ok');
+    const btnCancel = document.getElementById('mic-cancel');
+    function close(value) {
+      modal.classList.remove('show');
+      btnOk.removeEventListener('click', onOk);
+      btnCancel.removeEventListener('click', onCancel);
+      resolve(value);
+    }
+    function onOk() { close(true); }
+    function onCancel() { close(false); }
+    btnOk.addEventListener('click', onOk);
+    btnCancel.addEventListener('click', onCancel);
+    modal.classList.add('show');
+  });
 }
 
 function showRadio() {
