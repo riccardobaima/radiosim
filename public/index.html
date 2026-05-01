@@ -490,7 +490,7 @@ const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};
 // ════════════════════════════════════════════════
 let myCallsign='', myChannel='1', myRoom='', myPassword='', myAdminPassword='', myId='';
 let isAdmin=false;
-let ws=null, reconnectTimer=null, pingInterval=null, authFailed=false;
+let ws=null, reconnectTimer=null, authFailed=false;
 let reconnectAttempts = 0;
 // Backoff esponenziale per la riconnessione automatica:
 // 2s, 4s, 8s, 16s, poi tetto a 30s. Jitter ±20% per evitare che tutti i
@@ -581,7 +581,6 @@ function doLogout() {
 
   // Cancella riconnessione eventualmente in corso e timer
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-  if (pingInterval)   clearInterval(pingInterval);
   if (txTimerInt)     clearInterval(txTimerInt);
   if (sigInt)         clearInterval(sigInt);
   if (meterInt)       clearInterval(meterInt);
@@ -671,7 +670,8 @@ function connectWS() {
   ws.onopen = () => {
     setConn('connecting', 'CONNESSIONE...');
     ws.send(JSON.stringify({ type:'join', callsign:myCallsign, room:myRoom, channel:myChannel, password:myPassword, adminPassword:myAdminPassword }));
-    pingInterval = setInterval(() => { if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 15000);
+    // Keepalive a livello protocollo: il server fa PING ogni 30 s,
+    // il browser risponde automaticamente. Niente ping JSON applicativo.
   };
 
   ws.onmessage = (ev) => {
@@ -681,7 +681,6 @@ function connectWS() {
 
   ws.onclose = () => {
     setConn('error', 'OFFLINE');
-    clearInterval(pingInterval);
     // Niente riconnessione se la password è sbagliata: l'utente deve correggerla
     if (authFailed) return;
     document.getElementById('reconnect-banner').classList.add('show');

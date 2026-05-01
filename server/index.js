@@ -128,6 +128,24 @@ function getUserList(room, channel) {
 }
 
 // ─────────────────────────────────────────────
+// Heartbeat — drop dei client zombie via PING/PONG di protocollo WS
+// (es. dispositivo mobile sospeso: il TCP resta semi-aperto per ore se
+// non controllato attivamente). Latenza di rilevamento: 30-60 s.
+// ─────────────────────────────────────────────
+const HEARTBEAT_INTERVAL_MS = 30000;
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      console.log('[HEARTBEAT] Client non risponde — drop');
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    try { ws.ping(); } catch {}
+  });
+}, HEARTBEAT_INTERVAL_MS);
+wss.on('close', () => clearInterval(heartbeatInterval));
+
+// ─────────────────────────────────────────────
 // WebSocket handler
 // ─────────────────────────────────────────────
 wss.on('connection', (ws, req) => {
@@ -135,6 +153,9 @@ wss.on('connection', (ws, req) => {
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
            || req.socket.remoteAddress
            || 'unknown';
+
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (raw) => {
     let msg;
