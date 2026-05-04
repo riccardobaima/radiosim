@@ -110,6 +110,16 @@ html, body {
 }
 .join-btn:hover { opacity: 0.85; }
 .join-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.manual-btn {
+  display: block; width: 100%; text-align: center;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); border-radius: 8px;
+  font-family: var(--sans); font-weight: 600; font-size: 13px;
+  letter-spacing: 2px; padding: 11px; cursor: pointer;
+  text-decoration: none; transition: all .15s;
+  margin-top: -4px;
+}
+.manual-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
 .info-box {
   background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
   padding: 12px 14px; font-size: 13px; color: var(--text-dim); line-height: 1.7;
@@ -397,6 +407,8 @@ html, body {
   </div>
 
   <button class="join-btn" id="join-btn" onclick="doJoin()">ENTRA SUL CANALE ↗</button>
+
+  <a class="manual-btn" href="manuale.html" target="_blank" rel="noopener">📖 APRI MANUALE</a>
 
   <div class="info-box">
     <strong>Come funziona:</strong><br>
