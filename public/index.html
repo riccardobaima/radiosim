@@ -389,7 +389,7 @@ html, body {
   </div>
   <div class="field">
     <div class="field-label">STANZA / SESSIONE</div>
-    <input id="in-room" type="text" value="FORMAZIONE-01" maxlength="24" autocomplete="off" spellcheck="false">
+    <select id="in-room"></select>
   </div>
   <div class="field">
     <div class="field-label">CODICE ACCESSO</div>
@@ -552,6 +552,25 @@ fetch('/version')
   })
   .catch(() => {});
 
+// Popola il select delle stanze leggendo la lista pre-codificata dal server
+fetch('/rooms')
+  .then(r => r.json())
+  .then(d => {
+    const sel = document.getElementById('in-room');
+    if (!sel || !Array.isArray(d.rooms)) return;
+    sel.innerHTML = '';
+    d.rooms.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+  })
+  .catch(() => {
+    // Fallback minimo se l'endpoint non risponde
+    const sel = document.getElementById('in-room');
+    if (sel) sel.innerHTML = '<option value="SALA-ALPHA">SALA-ALPHA</option>';
+  });
+
 const CH_NAMES = {'1':'Fir-Dig-1_slot_A','2':'Fir-Dig-1_slot_B','3':'Fir-Dig-2_slot_A','4':'Fir-Dig-2_slot_B'};
 const CH_LBLS  = {'1':'CH 01','2':'CH 02','3':'CH 03','4':'CH 04'};
 
@@ -587,7 +606,7 @@ async function doJoin() {
   if (!cs) { alert('Inserisci il tuo nominativo'); return; }
   myCallsign = cs;
   myChannel  = document.getElementById('in-channel').value;
-  myRoom     = document.getElementById('in-room').value.trim().toUpperCase() || 'FORMAZIONE-01';
+  myRoom     = document.getElementById('in-room').value;
   myPassword = document.getElementById('in-password').value;
   myAdminPassword = document.getElementById('in-admin-password').value;
 
@@ -1299,10 +1318,9 @@ document.addEventListener('keyup', e => {
 // ════════════════════════════════════════════════
 // INPUT SANITIZE
 // ════════════════════════════════════════════════
-['in-callsign','in-room'].forEach(id => {
-  document.getElementById(id).addEventListener('input', function(){
-    this.value = this.value.toUpperCase().replace(/[^A-Z0-9\-_]/g,'');
-  });
+// Solo il callsign è un input testuale; la stanza ora è un select.
+document.getElementById('in-callsign').addEventListener('input', function(){
+  this.value = this.value.toUpperCase().replace(/[^A-Z0-9\-_]/g,'');
 });
 
 // ════════════════════════════════════════════════

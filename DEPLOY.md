@@ -82,6 +82,7 @@ Vai su Render → servizio `radiosim` → tab **Environment** → **Add Environm
 | `ADMIN_CALLSIGN` | facoltativa | Nominativo singolo che identifica l'admin. Default: `ADMIN`. Da preferire `ADMIN_CALLSIGNS` se servono più istruttori. |
 | `ADMIN_CALLSIGNS` | facoltativa | Lista CSV di nominativi admin (es. `MARCO-IST,LUCA-IST,SARA-IST`). Sostituisce `ADMIN_CALLSIGN`. Tutti gli istruttori condividono la stessa `ADMIN_PASSWORD` ma mantengono il proprio callsign distintivo nei log. |
 | `MAX_USERS_PER_CHANNEL` | facoltativa | Tetto al numero di utenti per coppia stanza+canale. Default `0` o assente = illimitato. Suggerito `8` per mantenere fluida la mesh WebRTC. Gli admin entrano sempre, anche se il canale è pieno. |
+| `ROOMS` | facoltativa | Lista CSV delle stanze disponibili nel menu (es. `SALA-ALPHA,SALA-BRAVO,SALA-CHARLIE,SALA-DELTA`). Default: queste 4 stanze. La stanza inserita dal client deve essere nella lista, altrimenti il join viene rifiutato con `INVALID_ROOM`. |
 
 > ⚠️ **Attenzione**: dopo aver salvato una variabile, Render riavvia automaticamente il servizio (~30-60 s). Controlla che non ci siano spazi accidentali a inizio/fine quando incolli i valori.
 
@@ -102,7 +103,7 @@ Invia ai volontari il link Render + il valore di `ACCESS_PASSWORD`. Niente da in
 |-------|-----------|
 | **Nominativo** | Inserisci il tuo callsign (es. ALFA-1, BRAVO-2). 2-12 caratteri, solo `A-Z`, `0-9`, `-`, `_`. |
 | **Canale** | Tutti devono scegliere lo stesso canale (1-4). |
-| **Stanza** | Tutti devono inserire lo stesso codice stanza (es. `ESERCITAZIONE-24`). Max 24 caratteri, stesso charset del nominativo. |
+| **Stanza** | Tutti devono selezionare la stessa stanza dal menu (default `SALA-ALPHA..DELTA`, configurabile via `ROOMS`). Stanze diverse sono completamente isolate. |
 
 ### PTT (Push To Talk)
 - **PC**: tieni premuta la **barra spaziatrice**

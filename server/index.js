@@ -30,6 +30,11 @@ const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ADMIN_ENABLED   = ADMIN_PASSWORD.length > 0;
 // Limite utenti per canale (per stanza). 0 o assente = illimitato.
 const MAX_USERS_PER_CHANNEL = Math.max(0, parseInt(process.env.MAX_USERS_PER_CHANNEL || '0', 10));
+// Lista stanze disponibili. Configurabile via env ROOMS (CSV).
+// Default: 4 SALA-ALPHA..DELTA. Il client popola il select da /rooms.
+const ROOMS_RAW = process.env.ROOMS || 'SALA-ALPHA,SALA-BRAVO,SALA-CHARLIE,SALA-DELTA';
+const ROOMS = ROOMS_RAW.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+const ROOMS_SET = new Set(ROOMS);
 // Finestra di grazia per la riconnessione: dopo close, l'utente resta
 // "in pending" per N ms. Se entro quel tempo rifa join con stesso
 // callsign+stanza+canale dallo stesso IP, sopprimiamo il broadcast di
@@ -42,6 +47,7 @@ if (ADMIN_ENABLED) console.log(`[ADMIN] Funzione admin ATTIVA (callsigns: ${[...
 else               console.log('[ADMIN] Funzione admin DISATTIVATA (manca ADMIN_PASSWORD)');
 if (MAX_USERS_PER_CHANNEL > 0) console.log(`[LIMIT] Max ${MAX_USERS_PER_CHANNEL} utenti per canale`);
 else                           console.log('[LIMIT] Nessun limite utenti per canale');
+console.log(`[ROOMS] Stanze disponibili: ${ROOMS.join(', ')}`);
 
 // ─────────────────────────────────────────────
 // Rate limit per password sbagliate (per IP)
@@ -187,6 +193,14 @@ wss.on('connection', (ws, req) => {
           console.log(`[VALIDATE] Join rifiutato da ${ip}: ${validationError}`);
           ws.send(JSON.stringify({ type: 'error', code: 'INVALID_INPUT',
             message: validationError }));
+          return;
+        }
+
+        // Stanza deve essere nella lista pre-codificata
+        if (!ROOMS_SET.has(room.toUpperCase())) {
+          console.log(`[VALIDATE] Stanza non valida da ${ip}: ${room}`);
+          ws.send(JSON.stringify({ type: 'error', code: 'INVALID_ROOM',
+            message: 'Stanza non valida. Seleziona una delle stanze disponibili.' }));
           return;
         }
 
@@ -499,6 +513,9 @@ app.get('/health', (_, res) => res.json({
 
 // Versione corrente — usata dal frontend per mostrare la build attiva
 app.get('/version', (_, res) => res.json({ version: APP_VERSION }));
+
+// Lista stanze disponibili — usata dal client per popolare il select
+app.get('/rooms', (_, res) => res.json({ rooms: ROOMS }));
 
 // Rooms status (debug)
 app.get('/status', (_, res) => {
