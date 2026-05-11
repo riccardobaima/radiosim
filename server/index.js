@@ -20,7 +20,12 @@ const wss    = new WebSocketServer({ server });
 const PORT            = process.env.PORT || 3000;
 const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || '';
 const AUTH_ENABLED    = ACCESS_PASSWORD.length > 0;
-const ADMIN_CALLSIGN  = (process.env.ADMIN_CALLSIGN || 'ADMIN').toUpperCase();
+// Admin callsign — supporta sia ADMIN_CALLSIGNS (lista CSV: "MARCO-IST,LUCA-IST")
+// sia ADMIN_CALLSIGN (singolo, retrocompat). Default: 'ADMIN'.
+const ADMIN_CALLSIGNS_RAW = process.env.ADMIN_CALLSIGNS || process.env.ADMIN_CALLSIGN || 'ADMIN';
+const ADMIN_CALLSIGNS = new Set(
+  ADMIN_CALLSIGNS_RAW.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+);
 const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ADMIN_ENABLED   = ADMIN_PASSWORD.length > 0;
 // Limite utenti per canale (per stanza). 0 o assente = illimitato.
@@ -33,7 +38,7 @@ const PENDING_RECONNECT_MS = 10000;
 
 if (AUTH_ENABLED)  console.log('[AUTH] Codice di accesso ATTIVO');
 else               console.log('[AUTH] Nessun codice — accesso libero (dev mode)');
-if (ADMIN_ENABLED) console.log(`[ADMIN] Funzione admin ATTIVA (callsign: ${ADMIN_CALLSIGN})`);
+if (ADMIN_ENABLED) console.log(`[ADMIN] Funzione admin ATTIVA (callsigns: ${[...ADMIN_CALLSIGNS].join(', ')})`);
 else               console.log('[ADMIN] Funzione admin DISATTIVATA (manca ADMIN_PASSWORD)');
 if (MAX_USERS_PER_CHANNEL > 0) console.log(`[LIMIT] Max ${MAX_USERS_PER_CHANNEL} utenti per canale`);
 else                           console.log('[LIMIT] Nessun limite utenti per canale');
@@ -185,7 +190,7 @@ wss.on('connection', (ws, req) => {
           return;
         }
 
-        const isAdminCallsign = callsign.toUpperCase() === ADMIN_CALLSIGN;
+        const isAdminCallsign = ADMIN_CALLSIGNS.has(callsign.toUpperCase());
         let isAdmin = false;
 
         if (isAdminCallsign) {

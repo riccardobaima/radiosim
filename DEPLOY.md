@@ -79,7 +79,8 @@ Vai su Render → servizio `radiosim` → tab **Environment** → **Add Environm
 |-----------|:-:|---------|
 | `ACCESS_PASSWORD` | sì (in produzione) | Codice di accesso per i volontari. Senza questa variabile l'accesso è libero (modalità dev). |
 | `ADMIN_PASSWORD` | facoltativa | Abilita il ruolo admin (vedi sezione dedicata sotto). Se non impostata, nessuno può entrare come admin. |
-| `ADMIN_CALLSIGN` | facoltativa | Nominativo che identifica l'admin. Default: `ADMIN`. |
+| `ADMIN_CALLSIGN` | facoltativa | Nominativo singolo che identifica l'admin. Default: `ADMIN`. Da preferire `ADMIN_CALLSIGNS` se servono più istruttori. |
+| `ADMIN_CALLSIGNS` | facoltativa | Lista CSV di nominativi admin (es. `MARCO-IST,LUCA-IST,SARA-IST`). Sostituisce `ADMIN_CALLSIGN`. Tutti gli istruttori condividono la stessa `ADMIN_PASSWORD` ma mantengono il proprio callsign distintivo nei log. |
 | `MAX_USERS_PER_CHANNEL` | facoltativa | Tetto al numero di utenti per coppia stanza+canale. Default `0` o assente = illimitato. Suggerito `8` per mantenere fluida la mesh WebRTC. Gli admin entrano sempre, anche se il canale è pieno. |
 
 > ⚠️ **Attenzione**: dopo aver salvato una variabile, Render riavvia automaticamente il servizio (~30-60 s). Controlla che non ci siano spazi accidentali a inizio/fine quando incolli i valori.
